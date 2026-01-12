@@ -44,7 +44,7 @@ Players should feel:
 | CLI-first | Text allows unreliable narration; potential for future graphical expansion |
 | 5-30 min sessions | Respects player time; supports "one more run" addiction |
 | Simple character building | Depth from decisions, not spreadsheets |
-| Sidegrade progression | Player skill improves, not character power |
+| Hybrid progression | Character grows stronger AND player skill improves |
 
 ---
 
@@ -137,28 +137,18 @@ The extraction mechanic is the game's primary hook—a constant push-your-luck d
 | 4 | Must find Waystone | 25% gold OR 1 item |
 | 5 | Boss guards the exit | Defeat boss |
 
-### The Corruption Timer
+### Floor Depth Effects
 
-The longer you stay, the more the dungeon corrupts you:
+The deeper you go, the more the dungeon corrupts what you find:
 
-```
-CORRUPTION: ████████░░░░░░░░░░░░ 40%
-```
+| Floor | Effect |
+|-------|--------|
+| 1-2 | None |
+| 3 | Found items have 20% curse chance |
+| 4 | Found items have 40% curse chance |
+| 5 | Found items have 60% curse chance, elite spawn rate +10% |
 
-**Sources:**
-- +10% per floor descended
-- +5% per 10 turns on a floor
-- Certain enemies/events add more
-
-**Effects by Level:**
-
-| Corruption | Effect |
-|------------|--------|
-| 0-30% | None |
-| 31-50% | Found items have 40% curse chance |
-| 51-70% | NPCs react with suspicion |
-| 71-90% | Random debuffs, extraction costs doubled |
-| 91%+ | Exit portals may fail (10% chance) |
+Note: Time pressure comes from Dread accumulation (+1 Dread per 5 turns), not a separate Corruption system.
 
 ### The Taunt
 
@@ -194,9 +184,11 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 
 | Source | Dread Gain |
 |--------|------------|
-| Killing an enemy | +2 |
-| Killing eldritch enemy | +5 |
+| Killing basic enemy | +2 |
+| Killing elite enemy | +5 |
+| Killing eldritch enemy | +8 |
 | Turn in darkness (no torch) | +3 |
+| Every 5 turns elapsed | +1 |
 | Reading forbidden text | +10 |
 | Horror encounter | +8-15 |
 | Descending a floor | +5 |
@@ -215,10 +207,20 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 | Level | Range | Effects |
 |-------|-------|---------|
 | Calm | 0-30 | Normal perception |
-| Uneasy | 31-50 | Occasional flavor text, -5% accuracy |
+| Uneasy | 31-50 | Occasional flavor text, enemy counts shown as ranges ("2-4 enemies") |
 | Shaken | 51-70 | **Hallucinations begin** (10% fake enemies), item stats shown as ranges |
-| Terrified | 71-90 | **Heavy hallucinations** (25%), can't identify items, compulsions |
-| Breaking | 91-100 | 15% chance character disobeys commands |
+| Terrified | 71-90 | **Heavy hallucinations** (25%), stats hidden entirely, whispers in combat log |
+| Breaking | 91-100 | Complete unreliability. **The Watcher spawns** (see below) |
+
+### The Watcher (100 Dread)
+
+At maximum Dread, the abyss notices you. A unique elite enemy called **The Watcher** spawns and pursues the player relentlessly.
+
+- Cannot be permanently killed—only driven back (respawns after 3 rooms)
+- Pursues until extraction or death
+- Makes 100 Dread extremely dangerous without breaking input reliability
+
+**Design Philosophy:** We corrupt INFORMATION, never INPUT. The player can always act; they just can't trust what they see. The Watcher adds mechanical danger at maximum Dread without taking control away from the player.
 
 ### The Unreliable Narrator
 
@@ -263,12 +265,13 @@ Some whispers contain useful hints. Most are noise. This creates paranoia—you 
 
 ### Design Philosophy
 
-**Never break input reliability.** The player must always be able to ACT. We only corrupt INFORMATION. If players feel they can't control their character, frustration replaces fear.
+**Never break input reliability.** The player must always be able to ACT. We only corrupt INFORMATION. When a player presses "attack," they attack—always. The unreliable narrator affects what they SEE, not what they DO.
 
 The Dread system works because:
 1. It's a unique CLI advantage (text can lie; graphics can't)
 2. It creates emergent stories ("I thought there were 3, there were 5, I died")
 3. It rewards careful play without punishing aggressive play
+4. At maximum Dread, The Watcher provides mechanical danger without breaking agency
 
 ---
 
@@ -338,9 +341,14 @@ Status effects can cascade dangerously. Poisoned + Bleeding can kill faster than
 ### Flee Mechanics
 
 Fleeing is always an option but never free:
-- Success chance based on enemy type (60-90%)
-- Failed flee gives enemy a free attack
-- Some enemies (bosses, eldritch) cannot be fled from
+
+| Enemy Type | Success Chance | On Success | On Failure |
+|------------|----------------|------------|------------|
+| Basic | 70% | Drop 10% gold | Free enemy attack |
+| Elite | 50% | Drop 15% gold | Free attack at +25% damage |
+| Boss | 0% | Cannot flee | N/A |
+
+Fleeing should be a meaningful decision, not a safety valve. The gold drop on successful flee creates tension even when escape succeeds.
 
 ---
 
@@ -392,9 +400,9 @@ Your "build" is determined by what you FIND, not what you CHOOSE in a menu. This
 
 Levels provide modest power but mainly serve as gating for dungeon access.
 
-### Meta-Progression (Sidegrades Only)
+### Meta-Progression
 
-Meta-progression adds VARIETY, never POWER:
+Meta-progression provides both **power growth** (leveling) and **variety expansion** (unlocks):
 
 **Gradual Item Pool Expansion:**
 - First 5 runs: 30-item pool (simple, learnable)
@@ -967,9 +975,10 @@ Short sentences. Hard consonants. The FEEL of impact.
 |------|-------|------------|
 | Unreliable narrator frustrates players | HIGH | Only corrupt information, never input. Always signal when perception is compromised ("Your vision swims..."). |
 | Show missed loot feels punishing | MEDIUM | Never show Legendary items. Frame as "adventure hook" not punishment. |
-| Sidegrade progression hurts retention | MEDIUM | Ensure early unlocks dramatically change playstyle. Classes should feel like new games. |
+| The Watcher feels unfair | MEDIUM | Clear visual/text signals before spawn. Give player time to react. Ensure fleeing The Watcher is possible (it pursues, not instakills). |
 | Turn-based combat feels slow | MEDIUM | Keep fights to 4-8 turns. Snappy UI. Show damage calculation as mini-celebration. |
 | Extraction makes deep floors feel optional | LOW | Best loot is floor 4-5 exclusive. Bounties require deep runs. Boss has Legendary chance. |
+| Stash items never used ("gear fear") | MEDIUM | Monitor usage rates. If <30% of runs bring items, consider partial recovery system. |
 
 ---
 
@@ -1002,5 +1011,16 @@ Short sentences. Hard consonants. The FEEL of impact.
 
 ---
 
-*Document version: 1.0*
-*Last updated: Based on multi-agent design collaboration*
+*Document version: 1.1*
+*Last updated: 2026-01-13 — Design review synthesis*
+
+### Changelog
+
+**v1.1 (2026-01-13)**
+- Unified Corruption into Dread system (time adds +1 Dread per 5 turns)
+- Removed "character disobeys commands" mechanic — replaced with The Watcher at 100 Dread
+- Changed from "sidegrade only" to hybrid progression (power + variety)
+- Updated flee mechanics (capped at 70%, gold drop on success)
+- Added Floor Depth Effects (curse chance tied to floor, not time)
+- Added design risks for The Watcher and gear fear
+- Created `docs/open-questions.md` for unresolved decisions
