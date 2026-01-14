@@ -63,11 +63,11 @@ Full design document: `docs/game-design.md`
 | Mechanic | Description |
 |----------|-------------|
 | **Extraction Dilemma** | Primary hook: "Go deeper for better loot, or extract now?" Floors 1-2 free, deeper floors cost gold/items via Waystones |
-| **Dread System** | Mental strain resource. At high Dread, CLI becomes unreliable narrator (enemy counts blur, stats hidden). Never break INPUT—only corrupt INFORMATION |
-| **Death as Discovery** | Deaths unlock bestiary entries, lore, warnings for future runs. Frame as "Lessons Learned" not failures |
+| **Dread System** | Mental strain resource (0-100). Progressive effects: 50+ blurs info (5%), 70+ hallucinations (15%), 85+ warnings, 100 spawns The Watcher. Never break INPUT—only corrupt INFORMATION |
+| **Death as Discovery** | Deaths unlock bestiary entries, lore, warnings, and "Lesson Learned" (+10% damage to killer enemy type next run). Frame as "Lessons Learned" not failures |
 | **Hybrid Progression** | Meta-progression adds both power (leveling: +5 HP/+1 stat per level) and variety (classes, items, mutators). Character grows stronger AND player skill improves |
 | **Stash System** | Safe storage (10-15 slots). Bring up to 2 items per run—if you die, brought items lost forever. Creates "gear fear" pre-run decision |
-| **Veteran Knowledge** | Permanent information unlocks (not power). Deaths/encounters teach boss telegraphs, enemy resistances, trap locations. You get smarter, not stronger |
+| **Veteran Knowledge** | Permanent information unlocks (not power). Tiered system: 5/15/25 encounters unlock progressively more info. You get smarter, not stronger |
 
 ### Key Design Rules
 
@@ -103,3 +103,4 @@ Full design document: `docs/game-design.md`
 - **Dungeon generation**: Hybrid (fixed structure + randomized content per run)
 - **Item persistence**: Stash system with risk (bring items = risk losing them)
 - **Permanent progression**: Hybrid—leveling provides power (+5 HP/+1 stat per level), Veteran Knowledge provides information advantages
+

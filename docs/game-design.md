@@ -141,12 +141,15 @@ The extraction mechanic is the game's primary hook—a constant push-your-luck d
 
 The deeper you go, the more the dungeon corrupts what you find:
 
-| Floor | Effect |
-|-------|--------|
-| 1-2 | None |
-| 3 | Found items have 20% curse chance |
-| 4 | Found items have 40% curse chance |
-| 5 | Found items have 60% curse chance, elite spawn rate +10% |
+| Floor | Curse Chance | Additional Effect |
+|-------|--------------|-------------------|
+| 1 | 5% | None |
+| 2 | 10% | None |
+| 3 | 15% | 10% mimic chance |
+| 4 | 20% | NPC prices +25% |
+| 5 | 25% | No merchant (boss floor) |
+
+**Cursed item design:** +30% primary stat, negative secondary effect (makes curses interesting choices, not just bad luck).
 
 Note: Time pressure comes from Dread accumulation (+1 Dread per 5 turns), not a separate Corruption system.
 
@@ -182,43 +185,58 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 
 ### Dread Sources
 
+*Values reduced by 30% from initial estimates to target 40-60 Dread at healthy extraction.*
+
 | Source | Dread Gain |
 |--------|------------|
-| Killing basic enemy | +2 |
-| Killing elite enemy | +5 |
-| Killing eldritch enemy | +8 |
-| Turn in darkness (no torch) | +3 |
+| Killing basic enemy | +1 |
+| Killing elite enemy | +3 |
+| Killing eldritch enemy | +5 |
+| Turn in darkness (no torch) | +1-2 (escalating) |
 | Every 5 turns elapsed | +1 |
-| Reading forbidden text | +10 |
-| Horror encounter | +8-15 |
+| Reading forbidden text | +8 |
+| Horror encounter | +5-10 |
 | Descending a floor | +5 |
 
 ### Dread Recovery
 
-| Method | Dread Loss |
-|--------|------------|
-| Rest at camp | Full reset |
-| Consume ration | -5 |
-| Lit torch (passive) | -1 per 5 turns |
-| Shrine blessing | -20 (with tradeoff) |
+*Camp no longer fully resets Dread - some persistence creates strategic decisions.*
+
+| Method | Dread Loss | Notes |
+|--------|------------|-------|
+| Rest at camp | -25 (min 10) | Cannot reduce below 10 |
+| Consume ration | -8 | |
+| Lit torch (passive) | -1 per 10 turns | |
+| Shrine blessing | -15 | With tradeoff |
+| Clarity potion | -10 | New consumable |
 
 ### Dread Thresholds
 
-| Level | Range | Effects |
-|-------|-------|---------|
-| Calm | 0-30 | Normal perception |
-| Uneasy | 31-50 | Occasional flavor text, enemy counts shown as ranges ("2-4 enemies") |
-| Shaken | 51-70 | **Hallucinations begin** (10% fake enemies), item stats shown as ranges |
-| Terrified | 71-90 | **Heavy hallucinations** (25%), stats hidden entirely, whispers in combat log |
-| Breaking | 91-100 | Complete unreliability. **The Watcher spawns** (see below) |
+*Progressive hallucination rates scale with Dread level.*
+
+| Level | Range | Hallucination Rate | Effects |
+|-------|-------|-------------------|---------|
+| Calm | 0-49 | 0% | Full accuracy |
+| Uneasy | 50-69 | 5% | Enemy count blur, damage variance |
+| Shaken | 70-84 | 15% | Above + fake sound cues, inventory flicker |
+| Terrified | 85-99 | 25% | Above + stat corruption, false item names, Watcher warnings |
+| Breaking | 100 | 25% + Watcher | Complete unreliability, **The Watcher spawns** |
 
 ### The Watcher (100 Dread)
 
 At maximum Dread, the abyss notices you. A unique elite enemy called **The Watcher** spawns and pursues the player relentlessly.
 
-- Cannot be permanently killed—only driven back (respawns after 3 rooms)
+**Warning Phase:**
+- 85 Dread: "Something stirs in the darkness. You feel watched." + visual flicker
+- 90 Dread: "The Watcher has noticed you. LEAVE NOW." + heartbeat audio
+- 100 Dread: The Watcher spawns
+
+**Watcher Stats:**
+- HP: 999 (effectively invincible)
+- Damage: 50 per hit (guaranteed hit)
+- Behavior: Pursues across rooms, prioritizes blocking extraction
+- Can be stunned for 1 turn with 30+ damage hit
 - Pursues until extraction or death
-- Makes 100 Dread extremely dangerous without breaking input reliability
 
 **Design Philosophy:** We corrupt INFORMATION, never INPUT. The player can always act; they just can't trust what they see. The Watcher adds mechanical danger at maximum Dread without taking control away from the player.
 
@@ -344,11 +362,15 @@ Fleeing is always an option but never free:
 
 | Enemy Type | Success Chance | On Success | On Failure |
 |------------|----------------|------------|------------|
-| Basic | 70% | Drop 10% gold | Free enemy attack |
-| Elite | 50% | Drop 15% gold | Free attack at +25% damage |
+| Basic | 70% | +5 Dread | +2 Dread, lose turn |
+| Elite | 50% | +5 Dread | +2 Dread, lose turn |
 | Boss | 0% | Cannot flee | N/A |
 
-Fleeing should be a meaningful decision, not a safety valve. The gold drop on successful flee creates tension even when escape succeeds.
+**Restrictions:**
+- Cannot flee on round 1
+- Cannot flee during ambush
+
+Fleeing should be a meaningful decision, not a safety valve. The Dread penalty on successful flee creates tension even when escape succeeds (aligned with Darkest Dungeon's 25 stress on retreat).
 
 ---
 
@@ -411,11 +433,18 @@ Meta-progression provides both **power growth** (leveling) and **variety expansi
 - Full pool: ~100 items
 
 **Class Unlocks:**
+
+*Mixed unlock methods - survival AND death. Both fit the "death as discovery" philosophy.*
+
 | Class | Unlock Condition | Playstyle |
 |-------|------------------|-----------|
-| Graverobber | Default | Balanced, loot bonuses |
-| Exorcist | Kill 10 undead | Anti-undead specialist |
-| Hollowed One | Die at 100 Dread | Can use cursed items safely |
+| Mercenary | Default | Balanced, standard stats |
+| Flagellant | Reach 85+ Dread, extract alive | High risk/reward, damage bonuses at low HP |
+| Hollowed One | Die at 100 Dread | Can use cursed items safely, Dread manipulation |
+
+**Narrative frames:**
+- Flagellant: "You walked the edge and returned. You Awakened."
+- Hollowed One: "The abyss claimed you, but you came back... changed."
 
 **Mutators (Difficulty Modifiers):**
 - Unlocked by specific achievements
@@ -461,26 +490,27 @@ Permanent **information** unlocks from experience. You get smarter, not stronger
 
 This extends the "death as discovery" philosophy — deaths literally teach you things that persist forever.
 
+**Three-Tiered Enemy Knowledge:**
+
+| Tier | Encounters | Information Unlocked |
+|------|------------|---------------------|
+| 1 | 5 | Name, HP range, damage range |
+| 2 | 15 | Attack patterns, resistances, weaknesses |
+| 3 | 25 | Exact stats, optimal strategies, lore entry |
+
 **Boss Knowledge:**
 
 | Knowledge | Unlock Condition | What You Learn |
 |-----------|------------------|----------------|
-| Telegraph | 3 deaths to boss | Attack pattern hints shown in combat |
-| Weakness | 5 deaths to boss | Bonus damage type revealed |
-
-**Enemy Knowledge:**
-
-| Knowledge | Unlock Condition | What You Learn |
-|-----------|------------------|----------------|
-| Resistances | 10 encounters | See resistances in bestiary |
-| Attack Patterns | 25 encounters | See attack behavior |
+| Telegraph | 2 deaths OR 5 encounters | Attack pattern hints shown in combat |
+| Weakness | 3 deaths OR use correct element once | Bonus damage type revealed |
 
 **Dungeon Knowledge:**
 
 | Knowledge | Unlock Condition | What You Learn |
 |-----------|------------------|----------------|
-| Trap Locations | 5 visits | Traps shown on minimap |
-| Elite Spawns | 10 visits | Elite spawn areas revealed |
+| Trap Locations | 3 visits | Traps shown on minimap |
+| Elite Spawns | 7 visits | Elite spawn areas revealed |
 
 **Why This Works:**
 
@@ -703,13 +733,20 @@ To avoid "seed exhaustion" (players seeing all variants quickly):
 
 **What you LOSE:**
 - All UNIDENTIFIED items
+- All carried (unequipped) items
+- Brought stash items (if any)
+- Carried gold
 - Current run progress
 
 **What you KEEP:**
-- All gold
+- Equipped items (return to stash)
 - All IDENTIFIED items
 - All meta-unlocks (bestiary, classes, etc.)
-- XP gained
+- XP gained this run
+- Character level
+
+**New Mechanic - Lesson Learned:**
+Next run starts with +10% damage against enemy type that killed you (persists 1 run). Creates narrative continuity and reduces frustration.
 
 ### The Chronicler
 
@@ -1011,10 +1048,25 @@ Short sentences. Hard consonants. The FEEL of impact.
 
 ---
 
-*Document version: 1.1*
-*Last updated: 2026-01-13 — Design review synthesis*
+*Document version: 1.2*
+*Last updated: 2026-01-14 — All open questions resolved via collaborative design review*
 
 ### Changelog
+
+**v1.2 (2026-01-14)**
+- Resolved all 18 open design questions via collaborative game design review
+- Reduced Dread accumulation values by 30% (target 40-60 at extraction)
+- Changed camp from full Dread reset to -25 (min 10) fixed reduction
+- Updated Dread thresholds with progressive hallucination rates (5%/15%/25%)
+- Added The Watcher warning phase at 85 Dread with stats
+- Updated flee mechanics (Dread penalty instead of gold drop, restrictions on round 1/ambush)
+- Updated floor curse chances (5/10/15/20/25% instead of 0/0/20/40/60%)
+- Updated class unlocks: mixed methods (Flagellant via survival, Hollowed One via death at 100 Dread)
+- Added Lesson Learned mechanic on death (+10% damage to killer enemy type)
+- Updated death economy (equipped items safe, carried items lost)
+- Added three-tiered Veteran Knowledge unlock system (5/15/25 encounters)
+- Defined MVP enemy roster (Ghoul, Plague Rat, Fleshweaver, Bone Colossus)
+- Defined MVP item pool (25 items: 7 weapons, 5 armor, 5 accessories, 8 consumables)
 
 **v1.1 (2026-01-13)**
 - Unified Corruption into Dread system (time adds +1 Dread per 5 turns)

@@ -4,6 +4,116 @@ This document contains design considerations and requirements that should be add
 
 ---
 
+## Presentation Layer Separation
+
+**The game core must be completely independent from its presentation layer.** While the initial implementation uses a CLI interface, the architecture must support replacing or extending this with alternative interfaces (graphical UI, web client, mobile app) without modifying game logic.
+
+### Architectural Principle
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Presentation Layer                        │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
+│  │  CLI/Text   │  │  Future UI  │  │  Agent Mode (JSON)  │  │
+│  │  Interface  │  │  (Graphics) │  │  for AI Players     │  │
+│  └──────┬──────┘  └──────┬──────┘  └──────────┬──────────┘  │
+└─────────┼────────────────┼────────────────────┼─────────────┘
+          │                │                    │
+          ▼                ▼                    ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Game Core API                           │
+│  • State queries (get player, get room, get enemies)        │
+│  • Action commands (attack, move, use item, extract)        │
+│  • Event subscriptions (on damage, on death, on loot)       │
+└─────────────────────────────────────────────────────────────┘
+          │
+          ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Game Core                               │
+│  Combat • Exploration • Dread • Loot • Progression          │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Core vs. Presentation Responsibilities
+
+| Belongs in Core | Belongs in Presentation |
+|-----------------|-------------------------|
+| Game state management | Rendering game state to screen |
+| Combat resolution | Combat animations/effects |
+| Loot generation | Item display formatting |
+| Dread calculations | Dread visual effects (text corruption, UI distortion) |
+| Valid action determination | Input parsing and command interpretation |
+| Event emission | Event visualization (damage numbers, notifications) |
+| Save/load logic | Save/load UI prompts |
+| Profile data management | Profile selection screens |
+
+### Design Requirements
+
+| Requirement | Description |
+|-------------|-------------|
+| **No I/O in Core** | Core never reads keyboard, prints to screen, or renders. It only processes commands and returns state. |
+| **Pure Game Logic** | Core functions are deterministic given the same inputs. Side effects (RNG) are injected. |
+| **Event-Driven Updates** | Core emits events (damage dealt, item found, Dread increased). Presentation subscribes and visualizes. |
+| **State Queries** | Presentation can query any observable game state at any time. Core doesn't push—presentation pulls. |
+| **Command Interface** | All player actions go through a unified command interface. Presentation translates input into commands. |
+| **Validation in Core** | Core validates all commands and returns errors. Presentation displays errors but doesn't validate. |
+
+### Interface Contract
+
+The Game Core exposes a clean API that any presentation layer implements against:
+
+```
+// Pseudocode - actual implementation language TBD
+
+interface GameCore {
+  // State queries
+  getGameState(): GameState
+  getAvailableActions(): Action[]
+  getPlayer(): PlayerState
+  getCurrentRoom(): RoomState
+
+  // Commands
+  executeAction(action: Action): ActionResult
+  startNewRun(config: RunConfig): void
+  extractFromDungeon(): ExtractionResult
+
+  // Events
+  onEvent(eventType: EventType, callback: (event) => void): void
+
+  // Persistence
+  saveGame(): SaveData
+  loadGame(data: SaveData): void
+}
+```
+
+### Dread and Presentation
+
+The Dread system's "unreliable narrator" effects are a presentation concern, not a core concern:
+
+- **Core responsibility**: Calculate Dread level, determine what information is "blurred" (enemy count uncertainty, hidden stats)
+- **Presentation responsibility**: Render the blurred information appropriately (CLI: fuzzy text; GUI: visual distortion; Agent: JSON ranges)
+
+The core returns something like `{ enemies: { count: "uncertain", range: [2, 4] } }` and each presentation layer decides how to display uncertainty.
+
+### Benefits
+
+| Benefit | Description |
+|---------|-------------|
+| **Testability** | Core can be unit tested without mocking I/O. Feed commands, assert state. |
+| **AI Agent Support** | Agent mode is just another presentation layer—already designed for this. |
+| **Future Flexibility** | Add graphical UI without rewriting game logic. |
+| **Parallel Development** | UI team and logic team can work independently against the API contract. |
+| **Modding Potential** | Third parties can create alternative interfaces. |
+
+### Implementation Notes
+
+- Use dependency injection to provide presentation-specific implementations to core if needed
+- Core should have zero imports from presentation modules
+- Consider a "headless" mode that runs core with no presentation for automated testing
+- The CLI and Agent Mode interfaces described elsewhere in this document are both presentation layer implementations
+
+---
+
 ## Data-Driven Configuration
 
 **All game balance values must be in external JSON config files, NOT hardcoded in source.**
@@ -30,6 +140,174 @@ Store configs in a `configs/` folder. Files should be human-readable and easily 
 **Why:** Enables rapid balance iteration without code changes. Designer can tweak values directly.
 
 When designing any system, the architect must identify which values are tunable and specify their config location.
+
+### Content Definitions (Items, Monsters, etc.)
+
+**All game content entities must be defined in JSON files, not hardcoded in source.** This includes items, monsters, status effects, skills, room types, events, and any other game content that could be added, removed, or modified without changing game logic.
+
+**Content directory structure:**
+
+```
+content/
+├── items/
+│   ├── weapons/
+│   │   ├── rusty_sword.json
+│   │   ├── vampiric_blade.json
+│   │   └── ...
+│   ├── armor/
+│   ├── consumables/
+│   └── accessories/
+├── monsters/
+│   ├── common/
+│   │   ├── skeleton_warrior.json
+│   │   ├── cave_rat.json
+│   │   └── ...
+│   ├── elites/
+│   └── bosses/
+├── status_effects/
+│   ├── bleed.json
+│   ├── poison.json
+│   └── ...
+├── skills/
+├── events/
+├── rooms/
+├── shrines/
+├── traps/
+└── loot_tables/
+```
+
+**Content categories:**
+
+| Directory | Contents |
+|-----------|----------|
+| `content/items/weapons/` | Individual weapon files (stats, effects, rarity, flavor text) |
+| `content/items/armor/` | Armor pieces (defense values, set bonuses, slot types) |
+| `content/items/consumables/` | Potions, scrolls, food (effects, durations, stacking rules) |
+| `content/items/accessories/` | Rings, amulets, trinkets (passive effects, procs) |
+| `content/monsters/common/` | Regular enemy definitions (stats, abilities, loot tables) |
+| `content/monsters/elites/` | Elite variants (modifiers, enhanced drops) |
+| `content/monsters/bosses/` | Boss definitions (phases, mechanics, guaranteed drops) |
+| `content/status_effects/` | All status effects (bleed, poison, stun—duration, damage, stacking) |
+| `content/skills/` | Player abilities (costs, effects, cooldowns) |
+| `content/events/` | Random encounter definitions (triggers, choices, outcomes) |
+| `content/rooms/` | Room type templates (layouts, spawn rules, interactables) |
+| `content/shrines/` | Shrine types (blessings, curses, costs) |
+| `content/traps/` | Trap definitions (damage, triggers, disarm difficulty) |
+| `content/loot_tables/` | Drop table definitions (weights, conditions, pools) |
+
+**One file per entity.** Each item, monster, or other content piece gets its own JSON file. Benefits:
+- Easier version control (no merge conflicts on single large file)
+- Simpler to find and edit specific content
+- Can add/remove content by adding/removing files
+- File name = entity ID (e.g., `rusty_sword.json` → ID is `rusty_sword`)
+
+**Example item file:**
+
+```json
+// content/items/weapons/vampiric_blade.json
+{
+  "name": "Vampiric Blade",
+  "slot": "weapon",
+  "rarity": "rare",
+  "base_damage": [8, 14],
+  "damage_type": "physical",
+  "effects": [
+    { "type": "on_hit", "effect": "lifesteal", "value": 0.1 }
+  ],
+  "requirements": { "might": 5 },
+  "flavor_text": "The blade drinks deep.",
+  "sell_value": 150,
+  "drop_weight": 10
+}
+```
+
+**Example monster file:**
+
+```json
+// content/monsters/common/skeleton_warrior.json
+{
+  "name": "Skeleton Warrior",
+  "type": "undead",
+  "base_stats": {
+    "hp": [15, 25],
+    "damage": [3, 6],
+    "armor": 2,
+    "speed": 3
+  },
+  "abilities": ["shield_block"],
+  "resistances": { "pierce": 0.5, "blunt": -0.25 },
+  "weaknesses": ["holy"],
+  "loot_table": "skeleton_loot",
+  "xp_value": 10,
+  "dread_on_kill": -2,
+  "flavor_text": "Bones held together by malice alone.",
+  "spawn_floors": [1, 5],
+  "spawn_weight": 80
+}
+```
+
+**Separation principle:**
+
+| Config Type | Location | Purpose |
+|-------------|----------|---------|
+| **Balance values** | `configs/` | Numbers that tune existing mechanics (damage multipliers, thresholds, rates) |
+| **Content definitions** | `content/` | Actual game entities (what exists in the game world) |
+
+**Why separate content from balance:**
+- Content files define WHAT exists (new sword, new monster)
+- Config files define HOW systems behave (damage formula, drop rate curves)
+- A designer adding a new item only touches `content/`
+- A designer tuning difficulty only touches `configs/`
+
+### Content Registry Module
+
+**A dedicated module should handle all content and config loading.** Game systems should never read JSON files directly—they query the registry.
+
+**Responsibilities:**
+
+| Responsibility | Description |
+|----------------|-------------|
+| **Loading** | Read all JSON files from `content/` and `configs/` at startup |
+| **Validation** | Check for missing fields, invalid references, type mismatches, duplicate IDs |
+| **Caching** | Parse once, serve from memory |
+| **Lookup API** | Provide typed accessors for all content types |
+| **Error reporting** | Clear, actionable errors on invalid content |
+
+**Interface concept:**
+
+```
+interface ContentRegistry {
+  // Items
+  getItem(id: string): Item
+  getItemsByType(type: ItemType): Item[]
+  getItemsByRarity(rarity: Rarity): Item[]
+
+  // Monsters
+  getMonster(id: string): Monster
+  getMonstersByDungeon(dungeonId: string): Monster[]
+  getMonstersForFloor(floor: number): Monster[]
+
+  // Status Effects
+  getStatusEffect(id: string): StatusEffect
+
+  // Config values
+  getConfig(path: string): any  // e.g., getConfig("dread.thresholds.blur_enemy_count")
+  getDreadConfig(): DreadConfig
+  getCombatConfig(): CombatConfig
+
+  // Loot
+  getLootTable(id: string): LootTable
+  rollLoot(tableId: string, context: LootContext): Item[]
+}
+```
+
+**Why centralized:**
+- Single point of validation—catch errors at startup, not mid-game
+- Systems depend on typed interfaces, not file paths
+- Easy to mock for testing
+- Enables hot-reloading without changing consumer code
+
+**Hot-reloading (development mode):** Content changes should be reloadable without restarting the game. The registry watches for file changes and reloads affected content. Game systems automatically see updated values on next query.
 
 ---
 
