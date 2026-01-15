@@ -104,6 +104,7 @@ Standard Turn Cycle:
 | Heavy Attack | 3 Stam | 2x damage, 50% stagger chance, 25% armor penetration |
 | Dodge | 1 Stam | Avoid ONE incoming attack, +1 Stam next turn |
 | Block | 1 Stam | Reduce ALL incoming damage this turn by 50% (does not prevent status effects) |
+| Pass | 0 Stam | Skip action, +2 Stamina regeneration still applies |
 | Item | 0 Stam | Use consumable, ends turn |
 | Flee | 0 Stam | Success chance varies by enemy |
 
@@ -136,6 +137,15 @@ Heavy Attack is intentionally weaker against unarmored enemies (~83% damage effi
 
 **Stagger Effect:** Staggered enemies skip their next attack (1 turn). Bosses have stagger resistance (requires 2 staggers in 3 turns to trigger).
 
+### Pass Action
+
+The PASS action allows players to bank stamina for future turns:
+- Cost: 0 Stamina
+- Effect: Skip your action, +2 Stamina regeneration still applies
+- Use case: Player has 1 Stamina, wants Heavy Attack (3 Stam) next turn
+
+**Design Note:** PASS is never strategically dominant because enemies still attack during your turn. It's a tactical option for stamina management, not a way to avoid combat.
+
 ---
 
 ## Status Effects
@@ -166,6 +176,22 @@ Status effects can cascade dangerously. Poisoned + Bleeding can kill faster than
 - Bleeding: Bandage (consumable) clears all stacks, or rest at camp
 - Cursed: Purification Shrine or Purging Stone (rare consumable)
 
+### Status Effect Persistence Between Combats
+
+| Effect Type | Persistence Rule |
+|-------------|------------------|
+| Poisoned | Ends when combat ends |
+| Bleeding | Ends when combat ends |
+| Stunned | N/A (1 turn only) |
+| Weakened | Ends when combat ends |
+| Cursed | Persists until cured (extraction, shrine, or consumable) |
+| Shrine Blessings | Persist until extraction/death |
+| Protection (Shrine) | Counter persists between combats, decrements per combat |
+
+**Design Rationale:** Most status effects END when combat ends. This prevents punishing players for fighting defensively (long fights don't accumulate DoT across rooms). Cursed is the exception because it's a severe, story-relevant condition.
+
+**Flee vs Combat End:** Fleeing does NOT count as "combat ending." If you flee while poisoned, you remain poisoned. Combat only "ends" when the enemy is defeated.
+
 ---
 
 ## Combat Pacing
@@ -175,6 +201,119 @@ Status effects can cascade dangerously. Poisoned + Bleeding can kill faster than
 - **Boss fights:** 8-12 turns
 
 **Critical for Session Length:** Combat must average 1.5-2 minutes to hit 20-28 minute full dungeon target. If fights consistently exceed 2.5 minutes, session length bloats beyond target.
+
+---
+
+## Enemy AI Behavior System
+
+Each enemy type uses a **priority-based decision system**. On their turn, enemies evaluate conditions from top to bottom and execute the first action whose condition is met.
+
+### AI Decision Framework
+
+```
+ENEMY TURN DECISION
+-------------------
+1. Check special ability conditions (top priority)
+2. Check defensive conditions
+3. Execute default attack
+```
+
+### Basic Enemy AI
+
+#### Plague Rat
+**Speed:** Fast (first-strike on Turn 1)
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Always | Light Attack (5-8 damage, 30% Poison) |
+
+**AI Notes:** Pure aggression. The 30% Poison on every hit is the real threat over multiple turns.
+
+#### Ghoul
+**Speed:** Normal
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Always | Light Attack (8-12 damage) |
+
+**AI Notes:** Baseline enemy. No special mechanics.
+
+#### Plague Ghoul
+**Speed:** Normal
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Player NOT poisoned | Venomous Bite (6-10 damage, 100% Poison) |
+| 2 | Player IS poisoned | Light Attack (6-10 damage, 30% Poison refresh) |
+
+**AI Notes:** Prioritizes applying poison, then maintains it.
+
+#### Skeleton Archer
+**Speed:** Normal
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Roll 1-10 (10% chance) | Aimed Shot (10-14 damage, guaranteed crit = 20-28 damage) |
+| 2 | Default | Arrow Shot (10-14 damage, 10% crit) |
+
+**AI Notes:** 10% "Aimed Shot" is telegraphed: "The Archer draws back, taking careful aim..."
+
+#### Armored Ghoul
+**Speed:** Slow (+25% damage from Heavy Attack)
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Own HP < 50% | Desperate Lunge (10-14 damage, loses 15% armor) |
+| 2 | Default | Armored Strike (10-14 damage) |
+
+**AI Notes:** At low HP, trades armor for aggression.
+
+#### Shadow Stalker
+**Speed:** Fast + Ambush (2 free actions before combat)
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Turn 1-2 (Ambush turns) | Surprise Strike (14-18 damage, +50% crit chance) |
+| 2 | Player HP < 30% | Finishing Strike (14-18 damage, +100% crit chance) |
+| 3 | Default | Shadow Strike (14-18 damage) |
+
+**AI Notes:** Extremely dangerous opener. Rewards bringing defensive items.
+
+#### Corpse Shambler
+**Speed:** Slow (+25% damage from Heavy Attack)
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Always | Crushing Blow (6-10 damage) |
+
+**AI Notes:** Cannot be staggered (Relentless trait). High HP, low damage war of attrition.
+
+### Elite Enemy AI
+
+#### Fleshweaver
+**Speed:** Slow
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Own HP <= 50% AND Life Drain not used | Life Drain (10 damage, heal 15 HP) |
+| 2 | Default | Soul Tear (15-20 damage) |
+
+**AI Notes:** Life Drain triggers ONCE at 50% HP. Telegraphed one turn before: "The Fleshweaver's eyes glow with hunger..."
+
+#### Bone Knight
+**Speed:** Normal
+| Priority | Condition | Action |
+|----------|-----------|--------|
+| 1 | Player just used Heavy Attack | Shield Bash (18-24 damage, 30% stun) |
+| 2 | Own HP < 30% | Desperate Charge (18-24 damage, drops armor to 15%) |
+| 3 | Default | Sword Strike (18-24 damage) |
+
+**AI Notes:** Punishes Heavy Attack spam. Optimal play: vary attack patterns.
+
+### Boss AI: Bone Colossus
+
+**Attack Cycle (3-turn):**
+| Cycle Turn | Action | Damage | Notes |
+|------------|--------|--------|-------|
+| 1 | Standard Strike | 18-24 | Single attack |
+| 2 | Telegraph | 0 | Safe damage window |
+| 3 | Crushing Blow | 36-48 | Double attack (18-24 x2) |
+
+**Ground Slam:** Replaces Standard Strike every 4th cycle. 15-20 damage, 50% stun chance.
+
+**Stagger Resistance:** Requires 2 staggers within 3 turns to trigger.
 
 ---
 
@@ -190,7 +329,7 @@ Where:
 - MIGHT Bonus: MIGHT stat x 1 (so 3 MIGHT = +3 damage)
 - Skill Multiplier: 1.0 for Light Attack, 2.0 for Heavy Attack
 - Bonus%: Sum of all additive damage bonuses (item effects, buffs)
-- Crit Multiplier: 2.0 on critical hit, 1.0 otherwise
+- Crit Multiplier: 2.5 on critical hit, 1.0 otherwise (v1.6: increased from 2.0x)
 - Effective Armor%: See Armor System below
 ```
 
@@ -271,7 +410,7 @@ Target: 4-6 turns survivable against basic enemies without healing
 ### Critical Hit System
 
 ```
-Crit Damage = 2x base damage (applied after all additive bonuses)
+Crit Damage = 2.5x base damage (applied after all additive bonuses)
 
 Crit Chance = 5% (base) + CUNNING Contribution + Gear Bonuses
 
@@ -286,6 +425,18 @@ At 10 CUNNING: 5% + 30% = 35% crit chance (soft cap threshold)
 At 15 CUNNING: 5% + 37.5% = 42.5% crit chance
 At 20 CUNNING: 5% + 45% = 50% crit chance (max from stats)
 ```
+
+**Balance Rationale (v1.6):**
+
+Crit multiplier increased from 2.0x to 2.5x to address MIGHT vs CUNNING imbalance:
+
+| Build (Level 20) | DPS Increase | Trade-offs |
+|------------------|--------------|------------|
+| Pure MIGHT | +133% | Consistent damage, no secondary benefits |
+| Pure CUNNING | +45% | Variable damage, loot detection, dialogue options |
+| Hybrid (10/10) | +80% | Balanced approach, some of each benefit |
+
+The 3x gap between pure builds is intentional: MIGHT is the "combat" stat, CUNNING is the "utility" stat with combat side benefits.
 
 → *Full details: [Character & Progression](character-progression.md#cunning-crit-scaling-soft-cap)*
 

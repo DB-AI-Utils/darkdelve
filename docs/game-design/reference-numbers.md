@@ -192,6 +192,36 @@ The Merchant eyes your equipment.
 | Standard Run (F1-4) | 140-300g | avg ~220g |
 | Full Clear (F1-5 + Boss) | 190-400g | avg ~320g (includes boss bonus) |
 
+### Gold Per Enemy Type
+
+| Enemy | Base Gold | Variance |
+|-------|-----------|----------|
+| Plague Rat | 3-5g | Low |
+| Ghoul | 5-8g | Low |
+| Plague Ghoul | 6-9g | Low |
+| Skeleton Archer | 6-9g | Low |
+| Armored Ghoul | 8-12g | Medium |
+| Corpse Shambler | 7-10g | Medium |
+| Shadow Stalker | 10-14g | Medium |
+| Fleshweaver (Elite) | 20-28g | High |
+| Bone Knight (Elite) | 25-35g | High |
+| Bone Colossus (Boss) | 50-75g | High |
+
+**Gold Floor Multiplier:**
+- Floor 1-2: 1.0x
+- Floor 3: 1.2x
+- Floor 4: 1.3x
+- Floor 5: 1.5x
+
+### Gold Per Treasure Source
+
+| Source | Gold Range |
+|--------|------------|
+| Standard Chest (Floor 1-2) | 8-15g |
+| Standard Chest (Floor 3-4) | 15-25g |
+| Standard Chest (Floor 5) | 20-35g |
+| Ornate Chest (Floor 4-5) | 30-50g |
+
 ### Gold Sinks
 
 | Sink | Cost | Notes |
@@ -231,11 +261,11 @@ Each run begins with **1 free Healing Potion** in consumable slots. This prevent
 
 | Item | Buy | Sell | Effect |
 |------|-----|------|--------|
-| Clarity Potion | 20g | 10g | -25 Dread |
+| Clarity Potion | 20g | 10g | -20 Dread (premium, rotating stock) |
 | ID Scroll | 30g | 15g | Identify 1 item in dungeon |
 | Smelling Salts | 35g | 17g | Cure stun, +10 Stamina |
 | Venom Flask | 40g | 20g | Coat weapon with poison (3 combats) |
-| Smoke Bomb | 45g | 22g | Guaranteed flee (ignores restrictions) |
+| Smoke Bomb | 45g | 22g | Guaranteed flee (bypasses Turn 1 and Ambush restrictions, NOT Watcher extraction block) |
 | Ironhide Tonic | 50g | 25g | +25% damage reduction for 1 combat |
 
 ### Equipment: Accessories Only
@@ -289,7 +319,7 @@ The Merchant sells **accessories only**—weapons, armor, and helms must be foun
 ## Timing
 
 - Combat encounter: 1.5-2 minutes (target), 2.5 minutes (max acceptable)
-- Full floor: 4-8 minutes (varies by room count: Floor 1-3 = 4-5 min, Floor 4 = 6 min, Floor 5 = 8 min)
+- Full floor: 4-9 minutes (varies by room count: Floor 1-4 = 4-5 min, Floor 5 = 9 min)
 - Full dungeon: 20-28 minutes (23 rooms total)
 
 ---
@@ -338,6 +368,90 @@ Use these metrics during playtesting:
 ---
 
 ## Changelog
+
+### v1.6 (2026-01-15)
+
+**Comprehensive blocker resolution.** All 21 active blockers resolved. Design documents ready for Architect phase.
+
+*Critical Blockers Resolved (9 items):*
+
+**B-001: Enemy AI Behavior System**
+- Added to `combat.md`: weighted random action selection, per-enemy action tables, HP-conditional modifiers
+- Enemies never use defensive actions (player advantage preserved)
+
+**B-002: Event System Outcomes**
+- Created `events.md` with 8 MVP event types fully specified
+- Alert mechanics, skill checks (CUNNING), outcome probability tables
+
+**B-003: Loot Generation Algorithm**
+- Added to `items.md`: step-by-step pseudocode, drop triggers, slot determination weights
+- Drop chance by enemy type (15% basic, 25% elite, 40% boss)
+
+**B-004: Gold Drop Values**
+- Added to `reference-numbers.md`: per-enemy gold (3-75g range), chest values, floor multipliers
+
+**B-005: Dungeon Layout Generation**
+- Added to `dungeon-generation.md`: 3 layout templates, generation pseudocode, enemy composition pools
+
+**B-006: MVP Item Templates**
+- Added to `items.md`: 15 equipment items + 5 consumables with complete stat values
+
+**B-007: Watcher Stun Threshold**
+- Lowered from 30 to 20 damage in `dread-system.md`
+- Starter Mercenary now has ~51% stun chance per Heavy Attack
+
+**B-008: Clarity Potion Contradiction**
+- Standardized to -20 Dread at 20g across all documents
+
+**B-009: Torch Effect Ambiguity**
+- Adopted gain reduction model: -5 Dread gain per floor duration
+
+*High Priority Issues Resolved (5 items):*
+
+**B-010: Combat at 0 Stamina**
+- Added PASS action to `combat.md`: skip action, +2 Stamina regen applies
+
+**B-011: Status Effect Persistence**
+- Added persistence rules to `combat.md`: combat effects END at combat end, Cursed persists
+
+**B-012: Watcher Defensive Actions**
+- Added Watcher Combat Rules to `dread-system.md`: Dodge bypassed, Block works (50% reduction), armor stacks
+
+**B-013: MIGHT vs CUNNING Imbalance**
+- Increased crit multiplier from 2.0x to 2.5x in `reference-numbers.md`
+
+**B-016: Gold Farming Penalty**
+- Documented 70% penalty rationale in `character-progression.md` with monitoring metrics
+
+*Medium Priority Issues Resolved (6 items):*
+
+**B-017: Cursed Item Mechanics**
+- Completed in `items.md`: cannot unequip until run end, 4 curse types, Hollowed One exception
+
+**B-018: Smoke Bomb Scope**
+- Clarified in `reference-numbers.md`: bypasses Turn 1 and Ambush, NOT Watcher or Boss room
+
+**B-019: Unarmed Combat**
+- Added Weapon Slot Rules to `character-progression.md`: weapon slot cannot be empty
+
+**B-020: Ration Item**
+- Removed undefined reference from `dread-system.md`
+
+**B-021: Turn Counting**
+- Defined as exploration turns (room entries) in `dread-system.md`
+
+**B-024: Save File Format**
+- Added technical specification to `save-system.md`: JSON format, semantic versioning, atomic saves
+
+*Previously Resolved:*
+
+**B-025: Floor 4 Difficulty Spike**
+- Redistributed room count: Floor 4 (5→4 rooms), Floor 5 (6→7 rooms)
+- Floor Introduction Sequence revised:
+  1. Floors 1-2: Core mechanics, free extraction
+  2. Floor 3: Waystone cost + armored enemies
+  3. Floor 4: Shadow Stalker ambush mechanic
+  4. Floor 5: Room count increase + Boss
 
 ### v1.5 (2026-01-15)
 

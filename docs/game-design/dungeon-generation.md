@@ -113,8 +113,130 @@ To avoid "seed exhaustion" (players seeing all variants quickly):
 
 ---
 
+## Floor Generation Algorithm
+
+### Layout Templates
+
+**3 Layout Templates per Floor Type:**
+
+```
+LAYOUT TEMPLATE A: Linear Branch
+================================
+       [2]
+        |
+[1]---[Hub]---[3]
+        |
+      [Exit]
+
+Best for: Floor 1-2 (simple navigation)
+
+
+LAYOUT TEMPLATE B: Loop
+=======================
+[1]---[2]---[3]
+ |           |
+[Hub]------[4]
+ |
+[Exit]
+
+Best for: Floor 3-4 (tactical routing)
+
+
+LAYOUT TEMPLATE C: Deep Corridor
+================================
+[1]---[2]---[3]---[4]
+             |
+           [Hub]
+             |
+           [Exit]
+
+Best for: Floor 4-5 (commitment to exploration)
+```
+
+**Template Assignment by Floor:**
+
+| Floor | Room Count | Templates Used |
+|-------|------------|----------------|
+| 1 | 4 rooms | A (80%), B (20%) |
+| 2 | 4 rooms | A (50%), B (50%) |
+| 3 | 4 rooms | B (60%), C (40%) |
+| 4 | 4 rooms | B (40%), C (60%) |
+| 5 | 7 rooms | C only |
+
+### Room Type Distribution
+
+| Floor | Combat | Treasure | Event | Boss | Total |
+|-------|--------|----------|-------|------|-------|
+| 1 | 2 | 1 | 1 | 0 | 4 |
+| 2 | 2 | 1 | 1 | 0 | 4 |
+| 3 | 2 | 1 | 1 | 0 | 4 |
+| 4 | 2 | 1 | 1 | 0 | 4 |
+| 5 | 4 | 1 | 1 | 1 | 7 |
+
+### Generation Pseudocode
+
+```
+function generateFloor(floorNumber):
+    // Step 1: Select template
+    template = selectTemplate(floorNumber)
+
+    // Step 2: Create room slots
+    rooms = createRoomsFromTemplate(template)
+
+    // Step 3: Assign room types
+    roomTypes = getRoomTypeDistribution(floorNumber)
+    shuffle(roomTypes)
+
+    // Boss room is furthest from entrance (Floor 5)
+    if floorNumber == 5:
+        furthestRoom = findFurthestRoom(rooms)
+        furthestRoom.type = BOSS
+        roomTypes.remove(BOSS)
+
+    // Assign remaining types
+    for room in rooms:
+        if room.type == null:
+            room.type = roomTypes.pop()
+
+    // Step 4: Validate connectivity
+    assert allRoomsReachable(rooms)
+
+    // Step 5: Generate contents
+    for room in rooms:
+        room.contents = generateContents(room.type, floorNumber)
+
+    return Floor(rooms)
+```
+
+### Enemy Composition Pools
+
+**Per Floor:**
+
+| Floor | Composition Pool |
+|-------|-----------------|
+| 1 | Plague Rat, Ghoul |
+| 2 | Ghoul, Plague Ghoul, Skeleton Archer |
+| 3 | Ghoul, Plague Ghoul, Armored Ghoul, Skeleton Archer |
+| 4 | Armored Ghoul, Shadow Stalker, Corpse Shambler, Fleshweaver (Elite) |
+| 5 | Shadow Stalker, Corpse Shambler, Bone Knight (Elite), Fleshweaver (Elite) |
+
+### Seed-Based Generation
+
+```
+Floor seed = hash(run_id + floor_number)
+Room content seed = hash(floor_seed + room_id)
+```
+
+This ensures:
+- Same run_id produces same dungeon
+- Fleeing and returning sees same enemies
+- Different runs produce different dungeons
+
+---
+
 ## Related Systems
 
 - [Dungeon Structure](dungeon-structure.md) - Floor layouts and room types
 - [Dread System](dread-system.md) - Dread as randomization accelerator
 - [Extraction System](extraction-system.md) - Floor-based extraction rules
+- [Events](events.md) - Event room outcome tables

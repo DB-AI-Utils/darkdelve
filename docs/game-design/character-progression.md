@@ -96,6 +96,17 @@ CONSUMABLES (2/3)
 - Equipping an item frees an inventory slot
 - Equipped items do not consume inventory space
 
+### Weapon Slot Rules
+
+*Added in v1.6 to resolve B-019.*
+
+**Weapon slot cannot be empty:**
+- Players cannot unequip their weapon without a replacement
+- "Unequip" action for weapons requires selecting a replacement from inventory or stash
+- Death recovery: If weapon somehow lost (bug, corruption), grant starter "Rusty Sword"
+
+**Design Rationale:** This eliminates the need to define unarmed combat stats while preserving simplicity. The player always has a weapon; the design question becomes "which weapon?" not "weapon or unarmed?"
+
 ---
 
 ## Gear System
@@ -213,6 +224,18 @@ Mirrors XP penalty to prevent degenerate gold farming on early floors with free 
 **Display:** *"The dungeon's lesser denizens carry little of value."*
 
 **Design Rationale:** XP penalty alone was insufficient—gold farming remained viable for high-level players repeatedly clearing Floors 1-2 with zero extraction cost. The 70% penalty makes this inefficient without making it impossible. Quick raids remain VIABLE (for recovery, casual play) but not OPTIMAL (deep runs still reward more gold per hour).
+
+**Balance Analysis (v1.6 - B-016):**
+
+The 70% gold penalty (vs 50% XP penalty) is intentional:
+- Recovery runs remain viable after bad deaths (70% of 20-50g = 14-35g, still meaningful)
+- Deep runs are ~44% more gold-efficient (correct incentive direction)
+- XP penalty gates progression regardless of gold
+- Time cost of safe farming is self-limiting (boring gameplay discourages abuse)
+
+| Metric | Target | Action if Exceeded |
+|--------|--------|-------------------|
+| Quick raid frequency (Level 10+) | <30% of runs | If >40%, reduce gold penalty to 60% |
 
 This prevents the XP grind wall at high levels by making deep runs the most efficient leveling method, aligning with the extraction dilemma (deeper = better rewards).
 

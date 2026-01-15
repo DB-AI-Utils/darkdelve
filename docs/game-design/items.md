@@ -396,9 +396,190 @@ All other data is derived from the item template combined with identification st
 
 ---
 
+## Loot Generation Algorithm
+
+### Loot Trigger Conditions
+
+| Trigger Source | Drop Chance | Item Count |
+|----------------|-------------|------------|
+| Basic Enemy Death | 40% | 1 item |
+| Elite Enemy Death | 75% | 1-2 items (75% for 1, 25% for 2) |
+| Boss Death | 100% | 2-3 items (50% each) |
+| Treasure Chest | 100% | 1 item |
+| Ornate Chest (Floor 4-5) | 100% | 2 items |
+
+### Generation Process
+
+```
+LOOT_GENERATION(source, floor, dread)
+=====================================
+
+Step 1: DETERMINE ITEM TYPE
+  Roll d100:
+    01-20 (20%): CONSUMABLE
+    21-100 (80%): EQUIPMENT
+
+  If source is CHEST and floor >= 3:
+    Consumable chance reduced to 10%
+
+Step 2: DETERMINE RARITY
+  Use floor rarity table from character-progression.md
+  Apply Dread Quality Bonus:
+    Upgrade Chance = Floor_Rare+_Rate + (Current_Dread% * 0.5)
+
+  If roll <= Upgrade_Chance: Shift rarity UP one tier
+
+Step 3: DETERMINE SLOT (Equipment Only)
+  Roll d100:
+    01-30 (30%): WEAPON
+    31-55 (25%): ARMOR
+    56-75 (20%): HELM
+    76-100 (25%): ACCESSORY
+
+Step 4: SELECT ITEM TEMPLATE
+  Filter by: slot, rarity, minLevel <= character.level
+  Select uniformly at random from filtered pool
+
+Step 5: SET IDENTIFICATION STATE
+  identified: false (all items start unidentified)
+```
+
+---
+
+## Cursed Item Mechanics
+
+### Core Rules
+
+| Rule | Specification |
+|------|---------------|
+| Equip Binding | Cursed items cannot be unequipped once equipped |
+| Unidentified Equip | Curse activates immediately, even if unidentified |
+| Curse Discovery | Cursed status revealed on first equip |
+| Removal Methods | Death (item lost), Purging Stone (rare), Purification Shrine |
+
+### Curse Effects
+
+| Curse Type | Effect | Typical Power Budget |
+|------------|--------|---------------------|
+| CURSE_DREAD_GAIN | +X% Dread gain while equipped | +25-35% |
+| CURSE_DAMAGE_TAKEN | +X% damage taken | +15-25% |
+| CURSE_NO_HEAL | Cannot heal by any means | N/A |
+| CURSE_BLEED_ON_HIT | Take 2 bleed damage when you attack | N/A |
+
+### Cursed Item Design
+
+Cursed items are **powerful but costly**:
+- +30% primary stat bonus (damage, HP, crit)
+- One significant curse effect
+- Risk/reward trade-off
+
+**Example:** Bloodletter (Cursed Epic Weapon)
+- Damage: 14-20 (+40% vs Rare baseline)
+- Lifesteal: 15%
+- CURSED: +25% Dread gain
+
+### Hollowed One Class Interaction
+
+The Hollowed One class (unlocked by dying to The Watcher) has special curse immunity:
+- Can equip cursed items without binding
+- Can unequip cursed items freely
+- Still suffers curse effects while equipped
+
+---
+
+## MVP Item Templates
+
+### Weapons (5 items)
+
+**Rusty Sword** (Common, Starting)
+- Damage: 5-8
+- Effects: None
+- *"Its edge is dull, but desperation sharpens all blades."*
+
+**Bone Club** (Common)
+- Damage: 6-9
+- Effects: None
+- *"Fashioned from a creature best left unnamed."*
+
+**Iron Longsword** (Uncommon)
+- Damage: 7-11
+- Effects: +5% Crit Chance
+- *"Proper steel. A welcome change from bone and rust."*
+
+**Venomfang Dagger** (Uncommon)
+- Damage: 5-8
+- Effects: 25% chance to poison on hit
+- *"The blade weeps a sickly green."*
+
+**Soulreaver Axe** (Rare)
+- Damage: 9-14
+- Effects: 10% Lifesteal, +2 flat damage
+- *"Each kill feeds its hunger. Each kill feeds yours."*
+
+### Armor (4 items)
+
+**Tattered Leathers** (Common, Starting)
+- Bonus HP: +5
+- *"Better than nothing. Barely."*
+
+**Boiled Leather Vest** (Common)
+- Bonus HP: +8
+- *"Stiff and uncomfortable. Protective nonetheless."*
+
+**Chainmail Shirt** (Uncommon)
+- Bonus HP: +10, Armor: 10%
+- *"The rings clink softly. A comforting sound."*
+
+**Plate of the Undying** (Rare)
+- Bonus HP: +15, Armor: 15%, -5% damage taken
+- *"Forged for those who refused to stay dead."*
+
+### Helms (3 items)
+
+**Dented Helm** (Common)
+- Bonus HP: +3
+- *"The previous owner's fate is written in its dents."*
+
+**Iron Visage** (Uncommon)
+- Bonus HP: +5, +1 VIGOR
+- *"See nothing. Fear nothing."*
+
+**Crown of Clarity** (Rare)
+- Bonus HP: +5, +2 CUNNING, -5 Dread gain per floor
+- *"The whispers quiet when you wear it. Mostly."*
+
+### Accessories (3 items)
+
+**Copper Ring** (Common)
+- +1 MIGHT
+- *"Worn smooth by countless worried fingers."*
+
+**Amulet of Fortune** (Uncommon)
+- +1 CUNNING, +8% Crit Chance
+- *"Luck is a fickle mistress."*
+
+**Ring of Shadows** (Rare)
+- +2 CUNNING, +10% Crit Chance, 20% chance +5 bonus damage
+- *"Darkness clings to it like a lover."*
+
+### Item Template Summary
+
+| Slot | Common | Uncommon | Rare | Total |
+|------|--------|----------|------|-------|
+| Weapon | 2 | 2 | 1 | 5 |
+| Armor | 2 | 1 | 1 | 4 |
+| Helm | 1 | 1 | 1 | 3 |
+| Accessory | 1 | 1 | 1 | 3 |
+| **Equipment Total** | **6** | **5** | **4** | **15** |
+
+Plus 5 consumables (Healing Potion, Antidote, Torch, Clarity Potion, Smoke Bomb) for **20 total MVP items**.
+
+---
+
 ## Related Systems
 
 - [Character & Progression](character-progression.md) - Inventory, gear slots, stash
 - [Death & Discovery](death-discovery.md) - Item loss on death
 - [Combat](combat.md) - How item stats affect combat
 - [Reference Numbers](reference-numbers.md) - Item prices and drop rates
+- [Events](events.md) - Event-based loot rewards

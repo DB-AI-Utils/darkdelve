@@ -162,9 +162,9 @@ Each dungeon has 5 floors with escalating risk and reward:
 |-------|-------|----------|------------|-------------|
 | 1 | 4 | ~4 min | Easy | Introductory floor, free extract |
 | 2 | 4 | ~5 min | Medium | Elites introduced (10% spawn) |
-| 3 | 4 | ~5 min | Hard | Waystone extraction costs begin |
-| 4 | 5 | ~6 min | Very Hard | Room count increase, epic loot |
-| 5 | 6 | ~8 min | Extreme | Boss, Legendary chance |
+| 3 | 4 | ~5 min | Hard | Waystone extraction costs begin, armored enemies |
+| 4 | 4 | ~5 min | Very Hard | Shadow Stalker introduced, epic loot |
+| 5 | 7 | ~9 min | Extreme | Room count increase, Boss, Legendary chance |
 
 **Total: 23 rooms for full clear = 20-28 minutes**
 
@@ -172,9 +172,9 @@ Each dungeon has 5 floors with escalating risk and reward:
 
 **Floor Introduction Sequence:**
 1. **Floor 1-2:** Core mechanics, free extraction (safe learning zone)
-2. **Floor 3:** Waystone cost begins (economic pressure)
-3. **Floor 4:** Room count increases + epic loot (duration matched with reward)
-4. **Floor 5:** Boss guards only exit (all-or-nothing finale)
+2. **Floor 3:** Waystone cost begins (economic pressure), armored enemies introduced (Heavy Attack requirement)
+3. **Floor 4:** Shadow Stalker ambush mechanic, epic loot potential
+4. **Floor 5:** Room count increase, Boss guards only exit (all-or-nothing finale)
 
 ---
 
@@ -249,8 +249,8 @@ Room breakdown by floor (designed for 1-1.5 min/room average):
 | 1 | 2 | 1 | 1 | 0 | 4 |
 | 2 | 2 | 1 | 1 | 0 | 4 |
 | 3 | 2 | 1 | 1 | 0 | 4 |
-| 4 | 2-3 | 1 | 1 | 0-1 | 5 |
-| 5 | 3 | 1 | 1 | 1 (+ boss) | 6 |
+| 4 | 2 | 1 | 1 | 0 | 4 |
+| 5 | 4 | 1 | 1 | 1 (+ boss) | 7 |
 
 **Room Time Budget:**
 - Combat rooms: 1.5-2 minutes (4-8 turns)

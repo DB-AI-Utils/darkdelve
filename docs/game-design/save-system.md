@@ -137,6 +137,99 @@ lessonLearned: { enemyType: string, runsRemaining: number } | null
 
 ---
 
+## Save File Technical Specification
+
+*Added in v1.6 to resolve B-024.*
+
+### Format: JSON
+
+JSON chosen for:
+- Human-readable (debugging)
+- Cross-platform compatibility
+- Easy version migration
+- Native support in all target languages
+
+### File Structure
+
+**Single File:** `darkdelve_save.json`
+
+```json
+{
+  "version": "1.0.0",
+  "saveTimestamp": "2026-01-15T14:30:00Z",
+  "checksum": "sha256:abc123...",
+
+  "character": {
+    "name": "Valdris",
+    "class": "Mercenary",
+    "level": 5,
+    "xp": 340,
+    "stats": { "vigor": 4, "might": 5, "cunning": 3 },
+    "equipment": {
+      "weapon": { "id": "item_001", "templateId": "iron_longsword", "identified": true },
+      "armor": { "id": "item_002", "templateId": "chainmail_shirt", "identified": true },
+      "helm": null,
+      "accessory": { "id": "item_003", "templateId": "copper_ring", "identified": false }
+    }
+  },
+
+  "stash": [
+    { "id": "item_004", "templateId": "soulreaver_axe", "identified": true }
+  ],
+
+  "gold": 245,
+  "veteranKnowledge": { "ghoul": { "encounters": 15, "deaths": 0, "tier": 2 } },
+  "bestiary": { "ghoul": true, "plague_rat": true },
+  "unlocks": { "classes": ["Mercenary"], "items": [], "mutators": [] },
+  "statistics": { "runsCompleted": 8, "runsFailed": 12, "totalGoldEarned": 1840, "deepestFloor": 5, "bossesDefeated": 1 },
+  "lessonLearned": { "enemyType": "shadow_stalker", "runsRemaining": 2 },
+  "eventMemory": { "woundedAdventurerHelped": true },
+  "settings": { "currentDread": 15 }
+}
+```
+
+### Version Scheme
+
+**Semantic Versioning:** `MAJOR.MINOR.PATCH`
+- MAJOR: Breaking changes (requires migration)
+- MINOR: New fields (backwards compatible)
+- PATCH: Bug fixes
+
+### Checksum
+
+SHA-256 hash of save content (excluding checksum field itself). Used to detect corruption.
+
+### Corruption Recovery
+
+| Scenario | Recovery Action |
+|----------|----------------|
+| Checksum mismatch | Attempt field-level recovery |
+| Malformed JSON | Load backup if exists |
+| Missing required field | Use default value + warning |
+| No recovery possible | Reset to new game + warning |
+
+### Save Location
+
+| Platform | Path |
+|----------|------|
+| Windows | `%APPDATA%/DARKDELVE/` |
+| macOS | `~/Library/Application Support/DARKDELVE/` |
+| Linux | `~/.local/share/DARKDELVE/` |
+
+### Atomic Save Process
+
+```
+1. Write to temp file (darkdelve_save.tmp)
+2. Verify temp file integrity (read back, check checksum)
+3. Rename existing save to backup (darkdelve_save.bak)
+4. Rename temp to save (darkdelve_save.json)
+5. Delete backup on successful verify
+```
+
+This prevents data loss from crashes during write operations.
+
+---
+
 ## Related Systems
 
 - [Camp System](camp-system.md) - Where saves trigger

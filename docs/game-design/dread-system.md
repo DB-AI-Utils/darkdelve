@@ -40,8 +40,10 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 | Killing elite enemy | +3 |
 | Killing eldritch enemy | +5 |
 | Turn in darkness (no torch) | +1-2 (escalating) |
-| Every 5 turns elapsed | +1 |
+| Every 5 exploration turns | +1 |
 | Reading forbidden text | +8 |
+
+**Exploration Turn:** An exploration turn is counted each time the player enters a room (new or previously visited). Combat rounds do NOT count as exploration turns.
 | Horror encounter | +5-10 |
 | Descending a floor | +5 |
 
@@ -54,10 +56,12 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 | Method | Dread Loss | Notes |
 |--------|------------|-------|
 | Rest at camp | -25 (min 10) | Cannot reduce below 10 |
-| Consume ration | -8 | |
-| Lit torch (passive) | -1 per 10 turns | |
+| Torch (consumable) | -5 Dread gain | For 1 floor duration |
 | Shrine blessing | -15 | With tradeoff |
-| Clarity potion | -10 | New consumable |
+| Calm Draught | -15 | Always available (18g) |
+| Clarity Potion | -20 | Rotating stock (20g) |
+
+**Torch Mechanic:** Torch reduces Dread GAIN (not current Dread). While active, all Dread sources are reduced by 5 points. Duration: 1 floor.
 
 ---
 
@@ -104,10 +108,39 @@ When The Watcher is active:
 ```
 THE WATCHER STUN RULES
 ----------------------
-Stun Threshold: 30+ damage in a single hit
+Stun Threshold: 20+ damage in a single hit
 Stun 1: Full duration (1 turn), Watcher recoils, extraction unsealed
 Stun 2: Full duration (1 turn), Watcher becomes ENRAGED
 Stun 3+: IMMUNE - "The Watcher learns your tricks. It will not be deterred again."
+```
+
+**Design Validation (v1.6):**
+At 20 damage threshold, a starter Mercenary (8-11 base damage) has ~51% chance to stun with Heavy Attack:
+- Heavy Attack: 16-22 damage (2x base)
+- Need 20+ to stun: 3 out of 7 possible outcomes (43%)
+- Plus 14% crit chance adds ~8% more
+- Total: ~51% success rate per Heavy Attack
+
+This ensures new players CAN escape with skilled play, but escape is not guaranteed.
+
+### Watcher Combat Rules
+
+| Mechanic | Rule |
+|----------|------|
+| Guaranteed Hit | Dodge does NOT avoid Watcher attacks |
+| Block Works | Block reduces Watcher damage by 50% (25 damage instead of 50) |
+| Armor Stacks | Player armor reduction applies normally |
+| No Flee | Cannot flee from The Watcher (extraction blocking) |
+| Smoke Bomb | Does NOT bypass Watcher extraction block (flee restrictions only) |
+
+**Damage Calculation vs The Watcher:**
+```
+Normal: 50 damage (bypasses Dodge)
+If Block: 50 * 0.5 = 25 damage
+If Block + 20% Armor: 25 * 0.8 = 20 damage
+
+Enraged: 75 damage
+If Block: 75 * 0.5 = 37.5 -> 38 damage
 ```
 
 ### Watcher Enrage (after 2nd stun)
