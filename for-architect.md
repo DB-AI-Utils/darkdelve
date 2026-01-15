@@ -180,16 +180,16 @@ content/
 
 | Directory | Contents |
 |-----------|----------|
-| `content/items/weapons/` | Individual weapon files (stats, effects, rarity, flavor text) |
+| `content/items/weapons/` | Individual weapon files (stats, effects, rarity, name, flavor text) |
 | `content/items/armor/` | Armor pieces (defense values, set bonuses, slot types) |
 | `content/items/consumables/` | Potions, scrolls, food (effects, durations, stacking rules) |
 | `content/items/accessories/` | Rings, amulets, trinkets (passive effects, procs) |
-| `content/monsters/common/` | Regular enemy definitions (stats, abilities, loot tables) |
+| `content/monsters/common/` | Regular enemy definitions (stats, abilities, loot tables, flavor) |
 | `content/monsters/elites/` | Elite variants (modifiers, enhanced drops) |
 | `content/monsters/bosses/` | Boss definitions (phases, mechanics, guaranteed drops) |
 | `content/status_effects/` | All status effects (bleed, poison, stun—duration, damage, stacking) |
-| `content/skills/` | Player abilities (costs, effects, cooldowns) |
-| `content/events/` | Random encounter definitions (triggers, choices, outcomes) |
+| `content/skills/` | Player abilities (costs, effects, cooldowns, descriptions) |
+| `content/events/` | Random encounter definitions (triggers, choices, outcomes, dialogue) |
 | `content/rooms/` | Room type templates (layouts, spawn rules, interactables) |
 | `content/shrines/` | Shrine types (blessings, curses, costs) |
 | `content/traps/` | Trap definitions (damage, triggers, disarm difficulty) |
@@ -206,7 +206,7 @@ content/
 ```json
 // content/items/weapons/vampiric_blade.json
 {
-  "name": "Vampiric Blade",
+  // Mechanical properties (Engineer writes)
   "slot": "weapon",
   "rarity": "rare",
   "base_damage": [8, 14],
@@ -215,9 +215,12 @@ content/
     { "type": "on_hit", "effect": "lifesteal", "value": 0.1 }
   ],
   "requirements": { "might": 5 },
-  "flavor_text": "The blade drinks deep.",
   "sell_value": 150,
-  "drop_weight": 10
+  "drop_weight": 10,
+
+  // Narrative properties (Narrative Agent writes—engineers use placeholders)
+  "name": "Vampiric Blade",
+  "flavor_text": "The blade drinks deep."
 }
 ```
 
@@ -226,7 +229,7 @@ content/
 ```json
 // content/monsters/common/skeleton_warrior.json
 {
-  "name": "Skeleton Warrior",
+  // Mechanical properties (Engineer writes)
   "type": "undead",
   "base_stats": {
     "hp": [15, 25],
@@ -240,9 +243,12 @@ content/
   "loot_table": "skeleton_loot",
   "xp_value": 10,
   "dread_on_kill": -2,
-  "flavor_text": "Bones held together by malice alone.",
   "spawn_floors": [1, 5],
-  "spawn_weight": 80
+  "spawn_weight": 80,
+
+  // Narrative properties (Narrative Agent writes—engineers use placeholders)
+  "name": "Skeleton Warrior",
+  "flavor_text": "Bones held together by malice alone."
 }
 ```
 
@@ -308,6 +314,101 @@ interface ContentRegistry {
 - Enables hot-reloading without changing consumer code
 
 **Hot-reloading (development mode):** Content changes should be reloadable without restarting the game. The registry watches for file changes and reloads affected content. Game systems automatically see updated values on next query.
+
+---
+
+## Narrative Content Workflow
+
+**Neither architects nor engineers write lore, flavor text, or narrative content.** A dedicated `dark-fantasy-narrative` agent handles all player-facing text. This is a **workflow discipline**, not a file structure—all properties of an entity (mechanical and narrative) live in the same file.
+
+### Role Boundaries
+
+| Role | Responsibility | Does NOT Do |
+|------|----------------|-------------|
+| **Architect** | Defines what text fields exist (item has `name`, `flavor_text`, `lore`) | Write actual flavor text |
+| **Engineer** | Implements systems, uses placeholder text in text fields | Invent names, descriptions, dialogue |
+| **Narrative Agent** | Populates text fields after systems are functional | Touch mechanical values or code |
+
+### Single File Per Entity
+
+An entity is a unified concept. A weapon's damage, name, and flavor text are all properties of one thing—they belong together:
+
+```json
+// content/items/weapons/vampiric_blade.json — COMPLETE ENTITY
+{
+  // Mechanical properties (Engineer)
+  "slot": "weapon",
+  "rarity": "rare",
+  "base_damage": [8, 14],
+  "damage_type": "physical",
+  "effects": [
+    { "type": "on_hit", "effect": "lifesteal", "value": 0.1 }
+  ],
+  "requirements": { "might": 5 },
+  "sell_value": 150,
+  "drop_weight": 10,
+
+  // Narrative properties (Narrative Agent)
+  "name": "Vampiric Blade",
+  "flavor_text": "The blade drinks deep.",
+  "lore": "Forged in the blood pits of Khael'dur, this weapon hungers eternally.",
+  "inspect_text": "Dark veins pulse along the steel. It feels warm to the touch."
+}
+```
+
+**Why unified files:**
+- Conceptual integrity—one entity, one file
+- Narrative agent sees mechanical context when writing (lifesteal → "drinks deep")
+- No file matching, merging, or orphan detection needed
+- Simpler Content Registry implementation
+
+### Text Field Conventions
+
+Standard text field names across all content types:
+
+| Field | Purpose | Used In |
+|-------|---------|---------|
+| `name` | Display name | All entities |
+| `flavor_text` | Short atmospheric text | Items, monsters, locations |
+| `lore` | Extended backstory (often unlockable) | Items, monsters, factions |
+| `inspect_text` | Detailed examination description | Items, interactables |
+| `description` | Functional description | Skills, status effects |
+| `dialogue` | NPC speech | Events, encounters |
+| `death_cry` | Message on death | Monsters |
+
+### Placeholder Conventions
+
+Engineers use obvious placeholders in text fields:
+
+| Placeholder Format | Example | Purpose |
+|-------------------|---------|---------|
+| `[FIELD_TYPE]` | `"name": "[NAME]"` | Generic placeholder |
+| `[ENTITY_FIELD]` | `"flavor_text": "[VAMPIRIC_BLADE_FLAVOR]"` | Specific placeholder |
+| Generic text | `"flavor_text": "A weapon."` | Functional but bland |
+
+**Finding incomplete text:** `grep -r '"\[.*\]"' content/` returns all placeholders awaiting narrative.
+
+### Workflow
+
+```
+1. Architect designs system
+   → Specifies which text fields each entity type needs
+   → Documents field purposes in architecture spec
+
+2. Engineer implements
+   → Creates content files with mechanical values
+   → Uses [PLACEHOLDER] or generic text in narrative fields
+   → System is fully functional with placeholder text
+
+3. Narrative Agent populates
+   → Edits content files, touching ONLY text fields
+   → Writes contextually appropriate text (can see mechanical properties)
+   → Replaces placeholders with final prose
+
+4. Validation
+   → Content Registry flags unresolved [PLACEHOLDER] patterns
+   → Game is complete when all placeholders resolved
+```
 
 ---
 
