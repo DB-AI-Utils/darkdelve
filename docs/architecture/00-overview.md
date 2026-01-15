@@ -341,4 +341,4 @@ Each module defines its test strategy. General approach:
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2024 | Initial architecture specification |
+| 1.0 | 2026 | Initial architecture specification |

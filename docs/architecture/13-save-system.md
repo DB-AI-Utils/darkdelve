@@ -866,7 +866,7 @@ profiles/
 │   │   ├── backup_001.json
 │   │   └── backup_002.json
 │   └── analytics/       # Event logs (see 14-analytics)
-│       └── events_2024-01.jsonl
+│       └── events_2026-01.jsonl
 ├── ironman_run/
 │   ├── profile.json
 │   ├── save.json

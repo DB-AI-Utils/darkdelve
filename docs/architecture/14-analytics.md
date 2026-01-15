@@ -1143,16 +1143,16 @@ The analytics system does not emit game events. It is a passive observer.
 ```
 profiles/{profileId}/analytics/
   events.jsonl           # Append-only event log (line-delimited JSON)
-  events_2024-01.jsonl   # Rotated event files (by month or size)
+  events_2026-01.jsonl   # Rotated event files (by month or size)
   aggregates.json        # Pre-computed summaries
 ```
 
 ### events.jsonl Format
 
 ```jsonl
-{"id":"evt_abc123","type":"run_started","timestamp":"2024-01-15T10:30:00Z","profileHash":"a1b2c3...","runId":"run_xyz","sessionId":"sess_123","playerType":"human","payload":{...}}
-{"id":"evt_abc124","type":"combat_started","timestamp":"2024-01-15T10:30:15Z","profileHash":"a1b2c3...","runId":"run_xyz","sessionId":"sess_123","playerType":"human","payload":{...}}
-{"id":"evt_abc125","type":"decision_combat_action","timestamp":"2024-01-15T10:30:20Z","profileHash":"a1b2c3...","runId":"run_xyz","sessionId":"sess_123","playerType":"human","payload":{...}}
+{"id":"evt_abc123","type":"run_started","timestamp":"2026-01-15T10:30:00Z","profileHash":"a1b2c3...","runId":"run_xyz","sessionId":"sess_123","playerType":"human","payload":{...}}
+{"id":"evt_abc124","type":"combat_started","timestamp":"2026-01-15T10:30:15Z","profileHash":"a1b2c3...","runId":"run_xyz","sessionId":"sess_123","playerType":"human","payload":{...}}
+{"id":"evt_abc125","type":"decision_combat_action","timestamp":"2026-01-15T10:30:20Z","profileHash":"a1b2c3...","runId":"run_xyz","sessionId":"sess_123","playerType":"human","payload":{...}}
 ```
 
 ### aggregates.json Format
@@ -1161,7 +1161,7 @@ profiles/{profileId}/analytics/
 {
   "version": "1.0.0",
   "profileHash": "a1b2c3...",
-  "lastUpdated": "2024-01-15T10:35:00Z",
+  "lastUpdated": "2026-01-15T10:35:00Z",
   "totalEventsProcessed": 1523,
   "runs": {
     "totalRuns": 47,

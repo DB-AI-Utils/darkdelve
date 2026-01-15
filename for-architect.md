@@ -608,8 +608,8 @@ Each profile maintains metadata in `profile.json`:
 ```json
 {
   "name": "speedrunner_test",
-  "created_at": "2024-01-15T10:30:00Z",
-  "last_played": "2024-01-20T18:45:00Z",
+  "created_at": "2026-01-15T10:30:00Z",
+  "last_played": "2026-01-20T18:45:00Z",
   "player_type": "human",
   "total_runs": 47,
   "game_version": "0.3.0"
