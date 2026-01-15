@@ -96,9 +96,20 @@ CONSUMABLES (2/3)
 - Equipping an item frees an inventory slot
 - Equipped items do not consume inventory space
 
+### Consumable Stacking
+
+*Added in v1.7 to resolve D-005.*
+
+- Identical consumables stack in a single slot (e.g., "Healing Potion x3")
+- Stack limit: 5 per slot
+- Different consumable types require separate slots
+- Consumable slots (3) are separate from inventory slots (8)
+
+**Design Rationale:** Stacking prevents consumables from dominating limited inventory space while the stack cap (5) ensures players cannot hoard infinite healing. The separate consumable slots create dedicated "utility belt" storage that doesn't compete with equipment finds.
+
 ### Weapon Slot Rules
 
-*Added in v1.6 to resolve B-019.*
+*Added in v1.7 to resolve B-019.*
 
 **Weapon slot cannot be empty:**
 - Players cannot unequip their weapon without a replacement
@@ -225,7 +236,7 @@ Mirrors XP penalty to prevent degenerate gold farming on early floors with free 
 
 **Design Rationale:** XP penalty alone was insufficient—gold farming remained viable for high-level players repeatedly clearing Floors 1-2 with zero extraction cost. The 70% penalty makes this inefficient without making it impossible. Quick raids remain VIABLE (for recovery, casual play) but not OPTIMAL (deep runs still reward more gold per hour).
 
-**Balance Analysis (v1.6 - B-016):**
+**Balance Analysis (v1.7 - B-016):**
 
 The 70% gold penalty (vs 50% XP penalty) is intentional:
 - Recovery runs remain viable after bad deaths (70% of 20-50g = 14-35g, still meaningful)
@@ -247,43 +258,35 @@ Levels provide modest power but mainly serve as gating for dungeon access.
 
 Meta-progression provides both **power growth** (leveling) and **variety expansion** (unlocks):
 
-### Gradual Item Pool Expansion
+### Item Pool (MVP)
 
-Item pool expands based on character level only. No achievement system required—level is already tracked.
+MVP uses a fixed item pool of 20 items. All items are available from Level 1.
 
-**Expansion Schedule:**
-
-| Level | Pool Size | New Items | Rationale |
-|-------|-----------|-----------|-----------|
-| 1-4 | 30 items | Base pool | Learn core items |
-| 5-7 | 45 items | +15 general | First milestone |
-| 8-10 | 60 items | +15 general | Mid-game variety |
-| 11-14 | 80 items | +20 general | Late-game depth |
-| 15+ | 100 items | +20 general | Full pool |
-
-**Rarity Entry Schedule:**
-
-| Rarity | Entry Point | Rationale |
-|--------|-------------|-----------|
-| Common | Level 1 | Always available |
-| Uncommon | Level 1 | Core variety |
-| Rare | Level 1 (3 items) | Aspirational from start |
-| Epic | Level 5+ (pool 45) | Reward for progression |
-| Legendary | Level 8+ (pool 60) | True endgame aspiration |
-
-**Base Pool Distribution (30 items):**
+**MVP Item Distribution:**
 
 | Slot | Common | Uncommon | Rare | Total |
 |------|--------|----------|------|-------|
-| Weapons | 4 | 2 | 1 | 7 |
-| Armor | 3 | 2 | 1 | 6 |
-| Helms | 2 | 2 | 0 | 4 |
-| Accessories | 2 | 2 | 1 | 5 |
-| Consumables | 8 | 0 | 0 | 8 |
+| Weapons | 2 | 2 | 1 | 5 |
+| Armor | 2 | 1 | 1 | 4 |
+| Helms | 1 | 1 | 1 | 3 |
+| Accessories | 1 | 1 | 1 | 3 |
+| Consumables | 5 | 0 | 0 | 5 |
 
-**Totals:** Common 19 (63%), Uncommon 8 (27%), Rare 3 (10%), Epic 0, Legendary 0
+**Totals:** Common 11 (55%), Uncommon 5 (25%), Rare 4 (20%)
 
-**Implementation:** On loot generation, filter item templates by `item.minLevel <= character.level`. No achievement tracking, no run counting—just one integer comparison.
+**Rarity Availability:**
+
+| Rarity | Availability | Notes |
+|--------|--------------|-------|
+| Common | Level 1+ | Always available |
+| Uncommon | Level 1+ | Always available |
+| Rare | Level 1+ | Low drop rate creates aspiration |
+| Epic | Post-MVP | Not in MVP item pool |
+| Legendary | Post-MVP | Not in MVP item pool |
+
+**Implementation:** On loot generation, select from full item pool. Rarity is determined by floor-based drop tables (see [Reference Numbers](reference-numbers.md)).
+
+**Post-MVP Expansion:** Item pool can grow to 50-100 items with level-gated unlocks. Epic items unlock at Level 5+, Legendary at Level 8+.
 
 **Post-MVP:** Achievement-based unlocks (boss kills, bestiary completion) can add SPECIFIC items as bonuses without replacing this system.
 

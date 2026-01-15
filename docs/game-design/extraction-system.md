@@ -21,6 +21,12 @@ The extraction mechanic is the game's primary hook—a constant push-your-luck d
 - Item sacrifice creates meaningful choice: "Is this item worth the extraction cost?"
 - Thematic justification: "The Waystone demands payment"
 
+**Extraction Atomicity:**
+Extraction is an atomic action. Once initiated, it completes regardless of damage. If HP would reach 0 during extraction, player extracts at 1 HP ("barely survived").
+
+**Desperation Extraction (No Resources):**
+If player has insufficient gold AND no carried items for extraction cost, they may sacrifice 1 equipped item (except weapon). If only weapon remains, extraction is free but inflicts +20 Dread.
+
 ---
 
 ## Floor Depth Effects

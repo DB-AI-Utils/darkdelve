@@ -216,9 +216,9 @@ function generateFloor(floorNumber):
 |-------|-----------------|
 | 1 | Plague Rat, Ghoul |
 | 2 | Ghoul, Plague Ghoul, Skeleton Archer |
-| 3 | Ghoul, Plague Ghoul, Armored Ghoul, Skeleton Archer |
-| 4 | Armored Ghoul, Shadow Stalker, Corpse Shambler, Fleshweaver (Elite) |
-| 5 | Shadow Stalker, Corpse Shambler, Bone Knight (Elite), Fleshweaver (Elite) |
+| 3 | Ghoul, Plague Ghoul, Skeleton Archer |
+| 4 | Ghoul, Armored Ghoul, Shadow Stalker, Corpse Shambler, Fleshweaver (Elite) |
+| 5 | Armored Ghoul, Shadow Stalker, Corpse Shambler, Bone Knight (Elite), Fleshweaver (Elite) |
 
 ### Seed-Based Generation
 

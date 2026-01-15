@@ -182,7 +182,7 @@ JSON chosen for:
   "bestiary": { "ghoul": true, "plague_rat": true },
   "unlocks": { "classes": ["Mercenary"], "items": [], "mutators": [] },
   "statistics": { "runsCompleted": 8, "runsFailed": 12, "totalGoldEarned": 1840, "deepestFloor": 5, "bossesDefeated": 1 },
-  "lessonLearned": { "enemyType": "shadow_stalker", "runsRemaining": 2 },
+  "lessonLearned": { "enemyType": "shadow_stalker", "runsRemaining": 1 },
   "eventMemory": { "woundedAdventurerHelped": true },
   "settings": { "currentDread": 15 }
 }

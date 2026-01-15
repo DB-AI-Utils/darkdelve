@@ -444,6 +444,9 @@ Step 5: SET IDENTIFICATION STATE
   identified: false (all items start unidentified)
 ```
 
+**Full Inventory Handling:**
+When loot drops and inventory is full, loot remains in room. Player may return after freeing inventory space. Room state persists until cleared or run ends.
+
 ---
 
 ## Cursed Item Mechanics
@@ -477,6 +480,10 @@ Cursed items are **powerful but costly**:
 - Damage: 14-20 (+40% vs Rare baseline)
 - Lifesteal: 15%
 - CURSED: +25% Dread gain
+
+### Cursed Item Death Recovery
+
+Cursed items follow standard death recovery rules. If Equipped + Identified, they return to stash (still cursed). The curse persists on the item.
 
 ### Hollowed One Class Interaction
 

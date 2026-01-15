@@ -47,6 +47,9 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 | Horror encounter | +5-10 |
 | Descending a floor | +5 |
 
+**Expected Event Contribution:**
+Pure combat Dread per standard run (F1-4) is approximately 25-30 points. To reach the target 40-60 Dread range, a standard run should include 1-2 Dread-generating events (horror encounters, forbidden texts, shrine choices with Dread cost) contributing +10-20 additional Dread. This event frequency should be tuned during dungeon generation to ensure the target Dread range is achievable.
+
 ---
 
 ## Dread Recovery
@@ -151,6 +154,9 @@ If Block: 75 * 0.5 = 37.5 -> 38 damage
 
 **Escape Window:** After stunning The Watcher, player has 2 turns to reach an extraction point before it recovers. This creates tactical gameplay rather than infinite stun-lock abuse.
 
+**Stun Window Movement Rules:**
+During the stun window, The Watcher is immobilized. Player can move through rooms freely. After 2 turns, Watcher resumes pursuit from its last position (does not teleport).
+
 ### Watcher + Boss Interaction Rules
 
 The Watcher and the Floor 5 boss have special interaction rules to prevent softlocks and undefined behavior:
@@ -245,7 +251,7 @@ When a player has Veteran Knowledge but is also experiencing Dread hallucination
 ```
 COMBAT: Ghoul
 ---------------------------------
-HP: 22...no, 18...maybe 24? [Veteran: 18-22]
+HP: 26...no, 22...maybe 28? [Veteran: 22-26]
 Damage: 8-12 [Veteran: confirmed]
 
 Status: Your hands shake. You can't trust your eyes.
@@ -261,10 +267,10 @@ Status: Your hands shake. You can't trust your eyes.
 
 | Dread Level | Display Without Knowledge | Display With Tier 3 Knowledge |
 |-------------|--------------------------|-------------------------------|
-| Calm (0-49) | HP: 20 | HP: 20 [exact] |
-| Uneasy (50-69) | HP: 18-22 | HP: 19...20? [Veteran: 20] |
-| Shaken (70-84) | HP: 15?...25? | HP: 15?...25? [Veteran: 20] |
-| Terrified (85-99) | HP: ??? | HP: ??? [Veteran: 20, but can you trust yourself?] |
+| Calm (0-49) | HP: 24 | HP: 24 [exact] |
+| Uneasy (50-69) | HP: 22-26 | HP: 23...24? [Veteran: 24] |
+| Shaken (70-84) | HP: 19?...29? | HP: 19?...29? [Veteran: 24] |
+| Terrified (85-99) | HP: ??? | HP: ??? [Veteran: 24, but can you trust yourself?] |
 
 **Design Philosophy:** At Terrified level, even with knowledge, flavor text questions whether veteran knowledge is reliable. This preserves horror while rewarding investment. Experience fights against madness, but madness always has the final word at extreme levels.
 

@@ -247,6 +247,9 @@ Only one shrine blessing active at a time. Choosing a new blessing replaces the 
 [2] Keep current blessing"
 ```
 
+**Same Blessing Re-selection:**
+Selecting your current blessing type has no effect. Display: "You already bear this blessing."
+
 **Strength Blessing Details:**
 - +3 MIGHT adds +3 damage to all attacks
 - Persists through all combat on current run

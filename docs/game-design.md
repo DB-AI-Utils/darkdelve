@@ -314,7 +314,7 @@ Short sentences. Hard consonants. The FEEL of impact.
 | Basic combat | P0 | 4 actions, stamina, status effects |
 | 8-10 enemy types | P0 | Base types + variants (see [Reference Numbers](game-design/reference-numbers.md)) |
 | 1 boss | P0 | Bone Colossus |
-| 50+ items | P0 | Across all rarities (weapons, armor, accessories, consumables) |
+| 20-25 items | P0 | Across all rarities (see [Items](game-design/items.md) for templates) |
 | Camp hub | P0 | Full UI navigation (see [Camp System](game-design/camp-system.md)) |
 | Stash system | P0 | 12 slots, bring up to 2 items per run |
 | Save system | P0 | Auto-save on commit actions (see [Save System](game-design/save-system.md)) |
@@ -336,7 +336,7 @@ Research shows 3 enemy types is a SEVERE content gap. Target 8-10 minimum:
 | Ghoul | Basic | 1-3 | Standard melee |
 | Plague Ghoul | Variant | 2-3 | Ghoul + poison (variant, not new asset) |
 | Skeleton Archer | Basic | 2-4 | High damage, fragile |
-| Armored Ghoul | Variant | 3-4 | Tanky ghoul variant |
+| Armored Ghoul | Variant | 4-5 | Tanky ghoul variant |
 | Shadow Stalker | Basic | 4-5 | Ambush, high damage |
 | Corpse Shambler | Basic | 3-5 | Slow tank |
 | Fleshweaver | Elite | 4-5 | Caster, life drain |
@@ -345,12 +345,13 @@ Research shows 3 enemy types is a SEVERE content gap. Target 8-10 minimum:
 
 **Variant Strategy:** Create 3 entries from 1 base type (Ghoul, Plague Ghoul, Armored Ghoul). This is how Hades achieves 133 "enemies" from ~30 base types.
 
-**Item Content Minimum:**
-- Weapons: 10-15
-- Armor: 8-10
-- Accessories: 8-10
-- Consumables: 15-20
-- Total: 50+ items for adequate variety
+**Item Content (MVP):**
+- Weapons: 5
+- Armor: 4
+- Helms: 3
+- Accessories: 3
+- Consumables: 5
+- Total: 20 items (see [Items](game-design/items.md) for full list)
 
 ### Defer Post-MVP
 
@@ -392,7 +393,7 @@ Research shows 3 enemy types is a SEVERE content gap. Target 8-10 minimum:
 
 ---
 
-*Document version: 1.5*
-*Last updated: 2026-01-15 — Resolved: Room Navigation, Turn Order, Floor Transitions, Item Schema, Armor Formula, VIGOR Resistance, Heavy Attack Validation, Veteran Knowledge Thresholds, Item Pool Expansion, Hollowed One Unlock, Watcher+Boss Interaction, Death Dread Formula, Floor 1-2 Farming*
+*Document version: 1.7*
+*Last updated: 2026-01-15 — Resolved all blockers B-027 to B-029, D-001 to D-005, E-001 to E-006. Armored Ghoul moved to Floor 4-5, Ghoul HP updated to 22-26, Lesson Learned duration clarified, edge cases documented.*
 
 → *Full changelog: [Reference Numbers](game-design/reference-numbers.md#changelog)*

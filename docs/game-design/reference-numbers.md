@@ -66,10 +66,10 @@ TOTAL CRIT CAP: 65% (from all sources combined)
 | Enemy | HP | Damage | Speed | Special | Floors |
 |-------|-----|--------|-------|---------|--------|
 | Plague Rat | 12-15 | 5-8 | Fast | 30% Poison on hit | 1-3 |
-| Ghoul | 18-22 | 8-12 | Normal | None | 1-4 |
+| Ghoul | 22-26 | 8-12 | Normal | None | 1-4 |
 | Plague Ghoul | 16-20 | 6-10 | Normal | 30% Poison on hit | 2-3 |
 | Skeleton Archer | 14-18 | 10-14 | Normal | Precise (10% crit chance) | 2-4 |
-| Armored Ghoul | 22-26 | 10-14 | Slow | 15% armor (use Heavy Attack) | 3-4 |
+| Armored Ghoul | 22-26 | 10-14 | Slow | 15% armor (use Heavy Attack) | 4-5 |
 | Shadow Stalker | 20-25 | 14-18 | Fast | Ambush (always acts first, no flee round 1) | 4-5 |
 | Corpse Shambler | 30-35 | 6-10 | Slow | Relentless (cannot be staggered) | 3-5 |
 
@@ -114,6 +114,13 @@ TOTAL CRIT CAP: 65% (from all sources combined)
 | Bone Colossus | 150 | Boss | Boss reward, includes completion | 13.6 |
 
 **XP Design Principle:** XP/turn increases with enemy difficulty tier. Basic enemies give 2.5-6.0 XP/turn, elites give 7.0-12.9 XP/turn, boss gives 13.6 XP/turn. This creates correct incentive: harder enemies are worth fighting, not avoiding.
+
+**XP Calculation Assumptions:**
+The XP targets in the Progression Metrics section (~740 XP for a standard run) are based on:
+- Combat rooms: ~60% of total rooms (4-5 combat rooms per 4-room floor)
+- Standard run (F1-4): ~10 combat encounters total
+- Elite spawn rate: 10-15% on Floors 3-4 (expect 1-2 elite encounters per standard run)
+- These targets assume typical encounter distribution, not worst/best case scenarios
 
 **XP Multipliers by Floor:**
 
@@ -338,7 +345,7 @@ Use these metrics during playtesting:
 | Turns to kill Armored Ghoul (Heavy) | 2 | >3 (armor too strong) |
 | Turns to kill Shadow Stalker | 3 | >4 (too tanky) or 1-2 (too glass) |
 | Turns to kill Corpse Shambler | 3-4 | >6 (slog) |
-| Turns to kill Bone Knight | 3-4 (with Heavy) | >6 (too tanky) or 2 (too easy) |
+| Turns to kill Bone Knight | 4-5 (with Heavy) | >6 (too tanky) or 2 (too easy) |
 | Player HP after Ghoul fight | 60-80% | <40% (too punishing) or 100% (no threat) |
 | Player HP after Shadow Stalker | 40-60% | <20% (too deadly) or >80% (not threatening) |
 | Player HP after Bone Knight | 40-60% | <20% (too punishing) or >80% (no threat) |
@@ -369,7 +376,7 @@ Use these metrics during playtesting:
 
 ## Changelog
 
-### v1.6 (2026-01-15)
+### v1.7 (2026-01-15)
 
 **Comprehensive blocker resolution.** All 21 active blockers resolved. Design documents ready for Architect phase.
 
@@ -449,9 +456,88 @@ Use these metrics during playtesting:
 - Redistributed room count: Floor 4 (5→4 rooms), Floor 5 (6→7 rooms)
 - Floor Introduction Sequence revised:
   1. Floors 1-2: Core mechanics, free extraction
-  2. Floor 3: Waystone cost + armored enemies
-  3. Floor 4: Shadow Stalker ambush mechanic
+  2. Floor 3: Waystone cost (economic pressure)
+  3. Floor 4: Armored enemies + Shadow Stalker ambush mechanic
   4. Floor 5: Room count increase + Boss
+
+**B-027: Floor 3 Mechanic Stacking**
+- **Problem:** Floor 3 introduced TWO major changes simultaneously (Waystone cost AND Armored Ghoul), violating "one major mechanic per floor" principle
+- **Resolution:** Moved Armored Ghoul floor range from 3-4 to 4-5
+- Updated `reference-numbers.md` enemy stats table
+- Updated `dungeon-generation.md` enemy composition pools (Floor 3 no longer includes Armored Ghoul; Floors 4-5 now include Armored Ghoul)
+- Floor 3 now introduces only Waystone extraction cost; Floor 4 introduces armored enemies alongside Shadow Stalker
+
+*Balance Fixes:*
+
+**B-028: Ghoul HP Too Low**
+- **Problem:** Ghoul (baseline enemy) died in 2 turns with starter weapon; target was 3-4 turns for meaningful combat decisions
+- **Resolution:** Increased Ghoul HP from 18-22 to 22-26
+- TTK now aligns with design target (3-4 turns with starter Mercenary)
+
+*Documentation Fixes:*
+
+**D-001: Bone Knight TTK Target**
+- **Problem:** Balance Validation Checklist showed "3-4 turns" but actual math shows 4-5 turns with Heavy rotation
+- **Resolution:** Updated Balance Validation Checklist to show "4-5 (with Heavy)" instead of "3-4 (with Heavy)"
+- Red flag thresholds unchanged (>6 too tanky, 2 too easy)
+
+**D-003: XP Calculation Assumptions**
+- **Problem:** XP targets (~740 for standard run) lacked clear calculation methodology
+- **Resolution:** Added XP Calculation Assumptions documentation after XP Design Principle
+- Documents: ~60% combat rooms, ~10 combat encounters per standard run, 10-15% elite spawn rate on Floors 3-4
+- Clarifies targets assume typical distribution, not worst/best case
+
+**D-004: Dread Event Frequency**
+- **Problem:** Pure combat Dread (~25-30 per standard run) is below target (40-60); event-based Dread sources needed
+- **Resolution:** Added Expected Event Contribution documentation to `dread-system.md` Dread Sources section
+- Specifies 1-2 Dread-generating events per run contributing +10-20 Dread
+- Guides dungeon generation tuning to hit 40-60 target range
+
+**D-005: Consumable Stacking Rules**
+- Added Consumable Stacking subsection to `character-progression.md` Inventory System section
+- Stacking rules: identical consumables stack, 5-per-slot cap, separate consumable slots (3) from inventory slots (8)
+- Includes design rationale for preventing consumable inventory bloat
+
+*Edge Case Specifications (6 items):*
+
+**B-029: Lesson Learned Duration Inconsistency**
+- **Problem:** `death-discovery.md` specified "persists 1 run" but `save-system.md` schema example showed `runsRemaining: 2`
+- **Resolution:** Changed save schema example from `runsRemaining: 2` to `runsRemaining: 1` in `save-system.md`
+
+**E-001: Extraction Interruption**
+- **Problem:** Undefined behavior when HP reaches 0 during extraction ritual
+- **Resolution:** Added "Extraction Atomicity" rule to `extraction-system.md`
+- Extraction is atomic; completes regardless of damage; if HP would reach 0, player extracts at 1 HP ("barely survived")
+
+**E-002: Full Inventory When Loot Drops**
+- **Problem:** Undefined behavior when enemy drops loot and inventory is full
+- **Resolution:** Added "Full Inventory Handling" rule to `items.md` Loot Generation section
+- Loot remains in room; player may return after freeing inventory space; room state persists until run ends
+
+**E-003: Cursed Item Death Recovery**
+- **Problem:** Unclear if curse overrides EQUIPPED+IDENTIFIED death recovery rule
+- **Resolution:** Added "Cursed Item Death Recovery" subsection to `items.md` Cursed Item Mechanics
+- Cursed items follow standard death recovery rules; curse persists on the item
+
+**E-004: Same Shrine Blessing Re-selected**
+- **Problem:** Undefined behavior when player selects their current blessing type
+- **Resolution:** Added "Same Blessing Re-selection" rule to `events.md` Shrine Events section
+- Selecting current blessing has no effect; displays "You already bear this blessing."
+
+**E-005: Extraction With No Gold AND No Items**
+- **Problem:** Softlock potential when player has 0 gold, all items equipped, no carried items on Floor 3-4
+- **Resolution:** Added "Desperation Extraction" rule to `extraction-system.md`
+- Player may sacrifice 1 equipped item (except weapon); if only weapon remains, extraction is free but inflicts +20 Dread
+
+**E-006: Watcher Escape Window Distance**
+- **Problem:** Undefined behavior when player stuns Watcher but is 3+ rooms from extraction
+- **Resolution:** Added "Stun Window Movement Rules" to `dread-system.md` Watcher Stun Mechanics
+- Watcher is immobilized during stun; player moves freely; after 2 turns Watcher resumes from last position (no teleport)
+
+**D-002: Shrine Room Type Clarification**
+- **Problem:** Unclear whether shrines are in EVENT rooms or separate SHRINE room type
+- **Resolution:** Added "Shrine Placement" clarification to `dungeon-structure.md` Room Types section
+- Shrines appear within EVENT rooms as part of the event pool
 
 ### v1.5 (2026-01-15)
 
@@ -486,14 +572,13 @@ Resolved all blockers and HIGH-PRIORITY concerns. Includes game designer blocker
 - **Rationale:** Requires deliberate engagement, respects player time, preserves death acceleration for "death as discovery"
 - Updated `character-progression.md` and `CLAUDE.md`
 
-*Item Pool Expansion Schedule (Blocker #8):*
-- **Problem:** Vague expansion milestones (30→100 items undefined)
-- **Resolution:** Level-based expansion only (no achievement system for MVP)
-- **Schedule:** 30 (L1-4) → 45 (L5-7) → 60 (L8-10) → 80 (L11-14) → 100 (L15+)
-- **Base pool:** 30 items (19 Common, 8 Uncommon, 3 Rare) across all slots
-- **Rarity gates:** Epic at Level 5+, Legendary at Level 8+
-- **Implementation:** `item.minLevel <= character.level` - single integer comparison
-- Added full expansion schedule and base pool distribution to `character-progression.md`
+*Item Pool (Blocker #8):*
+- **Problem:** Vague item count targets
+- **Resolution:** MVP uses fixed 20-item pool, all available from Level 1
+- **Base pool:** 20 items (11 Common, 5 Uncommon, 4 Rare) across all slots
+- **Rarity gates:** Epic and Legendary deferred to post-MVP
+- **Post-MVP:** Item pool can expand to 50-100 with level-gated unlocks
+- Updated `character-progression.md` with MVP item distribution
 
 *Hollowed One Unlock (Concern #4):*
 - **Problem:** "Die at 100 Dread on Floor 3+" nearly impossible (Watcher one-shots at 100 Dread)
@@ -598,7 +683,7 @@ Resolved blockers 3-9 and Floor 3 Difficulty Spike. Completed full 10-enemy MVP 
 *Complete Enemy Roster (10 enemies):*
 - Added 4 missing enemies to complete MVP roster:
   - **Plague Ghoul** (Variant): HP 16-20, Damage 6-10, Normal, 30% Poison, Floors 2-3, 12 XP
-  - **Armored Ghoul** (Variant): HP 22-26, Damage 10-14, Slow, 15% Armor, Floors 3-4, 15 XP
+  - **Armored Ghoul** (Variant): HP 22-26, Damage 10-14, Slow, 15% Armor, Floors 4-5, 15 XP
   - **Shadow Stalker** (Basic): HP 20-25, Damage 14-18, Fast, Ambush, Floors 3-5, 18 XP
   - **Corpse Shambler** (Basic): HP 30-35, Damage 6-10, Slow, Relentless, Floors 3-5, 15 XP
 - Variant strategy: Plague Ghoul and Armored Ghoul demonstrate Hades-style variants (3 entries from 1 base type)
@@ -756,7 +841,7 @@ Comprehensive review pass incorporating combat balance research (Hades, Dead Cel
 
 *MVP Scope Updates:*
 - Increased enemy requirement from 3 to 8-10 types with variant strategy
-- Increased item requirement from 20-30 to 50+ items
+- Clarified item requirement as 20-25 items for MVP
 - Added P0 infrastructure: Camp hub, Stash system, Character persistence, Gold tracking
 - Added P1 UX features: Item risk indicators, Pre-boss warning, Room type preview
 - Simplified MVP bestiary to binary unknown/known (3-tier system is post-MVP)
