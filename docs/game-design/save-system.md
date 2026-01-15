@@ -68,6 +68,8 @@ statistics:
   bossesDefeated: number
 
 lessonLearned: { enemyType: string, runsRemaining: number } | null
+  // Decrements at expedition START, not end. Dying does not restore the charge.
+  // Set to null when runsRemaining reaches 0.
 ```
 
 ---

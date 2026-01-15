@@ -142,7 +142,36 @@ If gear fear is detected (<30%), consider adding:
 
 ## Lesson Learned Mechanic
 
-Next run starts with +10% damage against enemy type that killed you (persists 1 run). Creates narrative continuity and reduces frustration. Display prominently on death screen and at run start.
+Next run starts with +10% damage against enemy type that killed you. Creates narrative continuity and reduces frustration. Display prominently on death screen and at run start.
+
+### Duration Rules
+
+**The charge decrements at expedition START, regardless of outcome.**
+
+| Event | Effect on Lesson Learned |
+|-------|-------------------------|
+| Enter dungeon | Charge consumed (runsRemaining -= 1) |
+| Die during run | Charge NOT restored |
+| Extract successfully | Charge already consumed at start |
+| Quit mid-run | Charge already consumed at start |
+
+This prevents "die until you win" exploits where players could repeatedly attempt a boss while keeping the damage bonus.
+
+### Display
+
+**On Death Screen:**
+```
+LESSON LEARNED
+  You've learned the Bone Knight's patterns.
+  +10% damage vs Bone Knights (next expedition)
+```
+
+**At Run Start (if active):**
+```
+LESSON LEARNED ACTIVE
+  +10% damage vs Bone Knights
+  "Their weakness is seared into your memory."
+```
 
 ---
 

@@ -236,6 +236,7 @@ The Merchant eyes your equipment.
 | Item identification | 25g | At Chronicler |
 | Extraction (Floor 3) | 10% gold (min 15g) | Or 1 item |
 | Extraction (Floor 4) | 25% gold (min 25g) | Or 1 item |
+| Threshold Retreat (Floor 5) | 25% gold (min 25g) | Or 1 item. Returns to F4, loses F5 progress. |
 | Merchant purchases | See below | Primary gold sink |
 
 ### Starting Gold
@@ -375,6 +376,35 @@ Use these metrics during playtesting:
 ---
 
 ## Changelog
+
+### v1.8 (2026-01-15)
+
+**Pre-implementation blocker resolution.** Red Team audit identified ambiguities; resolved before Architect phase.
+
+*Blockers Resolved:*
+
+**B-002: Threshold Chamber Extraction Ambiguity**
+- **Problem:** `dungeon-structure.md` stated "Floor 5 has NO extraction" but Threshold Chamber UI showed extraction option
+- **Resolution:** Implemented Threshold Retreat mechanic
+  - Floor 5 has NO Waystone extraction (rule is TRUE)
+  - Threshold Chamber offers RETREAT to Floor 4 (not extraction)
+  - Cost: 25% gold (min 25g) OR 1 item
+  - Effect: Return to Floor 4 Stairwell, ALL Floor 5 progress lost
+- Updated `dungeon-structure.md`: Threshold Chamber UI, Floor 5 Extraction Rules, new Threshold Retreat Mechanic section
+- Updated `reference-numbers.md`: Added Threshold Retreat to Gold Sinks table
+
+**B-003: Lesson Learned Duration Tracking**
+- **Problem:** Undefined when "1 run" charge is consumed—potential "die until you win" exploit
+- **Resolution:** Charge decrements at expedition START, regardless of outcome
+  - Entering dungeon consumes the charge
+  - Dying does NOT restore it
+- Updated `death-discovery.md`: Added Duration Rules table, exploit prevention rationale, display examples
+- Updated `save-system.md`: Added inline comment clarifying decrement timing
+
+*Documentation:*
+- Created `docs/blockers.md` to track design blockers and resolutions
+
+---
 
 ### v1.7 (2026-01-15)
 

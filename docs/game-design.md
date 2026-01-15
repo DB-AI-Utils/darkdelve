@@ -393,7 +393,7 @@ Research shows 3 enemy types is a SEVERE content gap. Target 8-10 minimum:
 
 ---
 
-*Document version: 1.7*
-*Last updated: 2026-01-15 — Resolved all blockers B-027 to B-029, D-001 to D-005, E-001 to E-006. Armored Ghoul moved to Floor 4-5, Ghoul HP updated to 22-26, Lesson Learned duration clarified, edge cases documented.*
+*Document version: 1.8*
+*Last updated: 2026-01-15 — Resolved B-002 (Threshold Chamber extraction → Retreat mechanic), B-003 (Lesson Learned decrements at expedition start). Created blockers.md for tracking.*
 
 → *Full changelog: [Reference Numbers](game-design/reference-numbers.md#changelog)*

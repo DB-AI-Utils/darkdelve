@@ -213,7 +213,9 @@ READINESS CHECK:
 
 [1] ENTER THE SANCTUM (No return)
 [2] Return to Floor 5 exploration
-[3] Use Waystone to extract now (last chance)
+[3] RETREAT to Floor 4 (25% gold or 1 item)
+    "The Waystone cannot extract you from these depths,
+     but it can pull you back to shallower ground."
 ```
 
 ### Readiness Indicator Thresholds
@@ -229,14 +231,36 @@ READINESS CHECK:
 - Readiness check is INFORMATIONAL, not gating (players can enter regardless)
 - MARGINAL and WARNING states use color coding (yellow/red)
 - First-time players see extended warning text; veterans see condensed version
-- Extraction option (3) only available if player has Waystone charges
+- Retreat option (3) always available at Threshold Chamber
 
 ### Floor 5 Extraction Rules
 
-- NO Waystone extraction available on Floor 5 (boss guards the only exit)
-- The Threshold Chamber is the LAST extraction opportunity
-- This must be communicated clearly before the player commits
+- **NO Waystone extraction available on Floor 5** (boss guards the only exit)
+- Floor 5 rewards can ONLY be extracted by defeating the boss
 - **Watcher Interaction:** If Dread reaches 100 during the boss fight, The Watcher spawn is deferred until after the boss is defeated. See [Dread System](dread-system.md#watcher--boss-interaction-rules) for full rules.
+
+### Threshold Retreat Mechanic
+
+The Threshold Chamber offers a **Retreat** option—NOT extraction. This returns the player to Floor 4.
+
+| Aspect | Specification |
+|--------|---------------|
+| Cost | 25% of carried gold (min 25g) OR 1 item |
+| Destination | Floor 4 Stairwell |
+| Consequence | ALL Floor 5 progress lost (rooms reset) |
+| Then | Normal Floor 4 extraction available |
+
+**Design Rationale:**
+- Maintains "Floor 5 has no extraction" as TRUE (retreat goes to F4, not camp)
+- Prevents Floor 5 farming without boss commitment
+- Provides safety valve for underprepared players
+- Retreat feels like player choice, not forced death
+
+**Validation Metrics:**
+| Metric | Target | Red Flag |
+|--------|--------|----------|
+| Retreat usage rate | <15% | >25% (boss may be overtuned) |
+| Boss attempt rate | >85% of Threshold arrivals | <75% (rewards may be insufficient) |
 
 ---
 
