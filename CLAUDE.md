@@ -20,12 +20,34 @@ This project uses a strict architect-engineer separation:
 
 ## Specialized Agents
 
-Use the Task tool with these agents for specialized work:
+Use the Task tool with these agents for specialized work. Agents are organized into color-coded teams:
+
+### Red Team (Game Design & Balance)
 
 | Agent | Purpose |
 |-------|---------|
 | `rpg-game-designer` | Game mechanics, balance, progression systems, loot design, player experience |
+| `mechanics-auditor` | Exploit detection, internal consistency, stress-testing mechanics |
+| `game-balance-tuner` | Numerical design, formulas, stat scaling, difficulty curves |
+| `progression-pacing-auditor` | Progression systems, difficulty curves, reward distribution |
+
+### Green Team (Narrative)
+
+| Agent | Purpose |
+|-------|---------|
 | `dark-fantasy-narrative` | Quest text, item descriptions, monster lore, NPC dialogue, world-building |
+
+### Orange Team (QA & Testing)
+
+| Agent | Purpose |
+|-------|---------|
+| `code-review-spec` | Implementation review against specs, architecture alignment, security |
+| `playtest-simulator` | Simulates playthroughs, validates balance, identifies design issues |
+
+### Pink Team (Research)
+
+| Agent | Purpose |
+|-------|---------|
 | `research-analyst` | Market research, technology evaluation, fact-checking |
 
 ## Game Design Considerations
@@ -67,7 +89,7 @@ Full design document: `docs/game-design.md`
 | **Death as Discovery** | Deaths unlock bestiary entries, lore, warnings, and "Lesson Learned" (+10% damage to killer enemy type next run). Frame as "Lessons Learned" not failures |
 | **Hybrid Progression** | Meta-progression adds both power (leveling: +5 HP/+1 stat per level) and variety (classes, items, mutators). Character grows stronger AND player skill improves |
 | **Stash System** | Safe storage (10-15 slots). Bring up to 2 items per run—if you die, brought items lost forever. Creates "gear fear" pre-run decision |
-| **Veteran Knowledge** | Permanent information unlocks (not power). Tiered system: 5/15/25 encounters unlock progressively more info. You get smarter, not stronger |
+| **Veteran Knowledge** | Permanent information unlocks (not power). Tiered system: 6/15/25 encounters OR 1/2/3 deaths unlock info. Deaths accelerate learning. You get smarter, not stronger |
 
 ### Key Design Rules
 

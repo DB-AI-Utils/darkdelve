@@ -4,6 +4,156 @@
 
 ---
 
+## Room Navigation System
+
+### Connectivity Model: Corridor-Based Graph
+
+Rooms connect via corridors forming a directed graph with symmetric edges (if A connects to B, B connects to A). This allows designers to create interesting topology with dead ends, loops, and chokepoints.
+
+```
+Room {
+  id: string            // "floor2_room3"
+  type: RoomType        // COMBAT, TREASURE, EVENT, REST, BOSS, STAIRS
+  state: RoomState      // UNEXPLORED, ENTERED, CLEARED
+  connections: RoomConnection[]
+}
+
+RoomConnection {
+  targetRoomId: string
+  direction: Direction  // NORTH, EAST, SOUTH, WEST (for display)
+}
+
+RoomState:
+  UNEXPLORED = Never entered, shows as '?' on map
+  ENTERED = Currently occupied or previously visited but not cleared
+  CLEARED = All threats neutralized, safe to traverse
+```
+
+### Movement Input Method
+
+Players select numbered corridor options rather than cardinal directions:
+
+```
+Available Paths:
+  [1] North  -> [TREASURE] A faint glint of metal ahead
+  [2] East   -> [COMBAT]   Something stirs in the darkness
+  [3] South  -> [CLEARED]  You've been here. Nothing remains.
+  [B] Back to previous room (if cleared)
+```
+
+Input: Single digit (1-4) or 'B' for backtrack.
+
+### Backtracking Rules
+
+| Rule | Specification |
+|------|---------------|
+| Allowed to | CLEARED rooms only |
+| Cost | 1 turn (Dread continues accumulating) |
+| Blocked when | In COMBAT room until combat resolved |
+| Blocked through | Uncleared rooms ("The sounds from that chamber... you can't go back that way.") |
+
+### Room Entry State Transitions
+
+**Entering UNEXPLORED room:**
+1. Room state changes to ENTERED
+2. Room contents revealed (type was known, specifics now shown)
+3. If COMBAT: Combat begins immediately (no pre-fight menu)
+4. If TREASURE/EVENT/REST: Choice menu appears
+5. If STAIRS: Descent/extraction prompt appears
+
+**Entering ENTERED (non-combat) room:**
+- Show room with current state (chest opened, NPC gone, etc.)
+
+**Entering CLEARED room:**
+- Safe passage, no encounters
+- Can loot remaining items if inventory was full before
+
+### Dread Corruption of Navigation
+
+| Dread Level | Navigation Corruption |
+|-------------|----------------------|
+| Calm (0-49) | Room type shown accurately, flavor text reliable |
+| Uneasy (50-69) | 5% chance room type displayed WRONG |
+| Shaken (70-84) | Room types hidden 30% of time (show as [?????]), number of exits may appear wrong (+/- 1) |
+| Terrified (85+) | All unexplored rooms show as [?????], backtrack paths may flicker |
+
+**Critical Rule:** Corruption affects DISPLAY only. Actual room contents are unchanged. Player input always works correctly.
+
+---
+
+## Floor Transition System
+
+### Stairwell Room
+
+Each floor has exactly ONE Stairwell room containing:
+- Stairs Down (leads to next floor)
+- Extraction Point (Floors 1-4 only; Floor 5 has none)
+
+Stairwell properties:
+- Visible on map from start (marked with ↓)
+- Always safe (no enemies, no events)
+- Contains ambient flavor text about depth
+
+### Descent Conditions
+
+| Floor | Descent Rules |
+|-------|---------------|
+| 1-4 | Available immediately upon entering Stairwell. No minimum room clear requirement. |
+| 5 | N/A (Floor 5 is final floor). Boss room is the only "exit". |
+
+**Descent Blocked When:**
+- The Watcher is active (must defeat or die first)
+- In combat (must resolve combat first)
+
+### One-Way Transitions
+
+**Floor transitions are permanent:**
+- Cannot return to previous floors
+- Thematic: "The stairs crumble behind you"
+- Prevents safe farming of early floors then descending
+- Simplifies floor state management
+
+**Within-floor backtracking:**
+- Allowed to any CLEARED room on current floor
+- After boss dies, can explore remaining Floor 5 rooms before extracting
+
+### Descent Dread Cost
+
+Descending a floor: **+5 Dread**
+Applied immediately upon descent, before first room of new floor.
+
+### Stairwell UI Display
+
+```
+═══════════════════════════════════════════════════════════════
+                    THE STAIRWELL
+═══════════════════════════════════════════════════════════════
+
+Cold air rises from the depths below. The darkness beckons.
+
+───────────────────────────────────────────────────────────────
+FLOOR 2 SUMMARY:
+  Rooms Explored: 3/4
+  Enemies Slain:  2
+  Gold Found:     34
+───────────────────────────────────────────────────────────────
+
+  [1] DESCEND TO FLOOR 3
+      Warning: +5 Dread. Extraction will cost gold or items.
+
+  [2] EXTRACT NOW (Free on Floors 1-2)
+      "Leave with what you have. Live to delve another day."
+
+  [3] RETURN TO FLOOR
+      "There may be rooms you haven't explored."
+
+───────────────────────────────────────────────────────────────
+HP: 42/50 | Dread: 28 | Gold: 34
+> _
+```
+
+---
+
 ## Floor Architecture
 
 Each dungeon has 5 floors with escalating risk and reward:
@@ -86,6 +236,7 @@ READINESS CHECK:
 - NO Waystone extraction available on Floor 5 (boss guards the only exit)
 - The Threshold Chamber is the LAST extraction opportunity
 - This must be communicated clearly before the player commits
+- **Watcher Interaction:** If Dread reaches 100 during the boss fight, The Watcher spawn is deferred until after the boss is defeated. See [Dread System](dread-system.md#watcher--boss-interaction-rules) for full rules.
 
 ---
 

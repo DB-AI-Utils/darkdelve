@@ -197,7 +197,7 @@ Specific deaths unlock specific rewards:
 | First death to poison | Antidote recipe unlocked |
 | Death with full inventory | "Last Stand" ability |
 | Death at exactly 1 HP | "Desperate Gamble" item |
-| Death at 100 Dread | Hollowed One class |
+| Death to The Watcher on Floor 3+ | Hollowed One class |
 
 ---
 

@@ -24,7 +24,9 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 **Run Start Dread Calculation:**
 - First run ever: 0 Dread
 - After extraction: Previous run's end Dread, then apply rest (-25, min 10)
-- After death: Dread resets to 10 (death purges some memories, but not all)
+- After death: Previous run's end Dread -25 (min 10) — same as extraction
+
+**Design Note:** Death and extraction now have identical Dread recovery. Death's penalty is purely item/gold loss, not Dread management. This prevents the perverse incentive where dying at high Dread was mechanically optimal for Dread reset.
 
 ---
 
@@ -115,6 +117,33 @@ Stun 3+: IMMUNE - "The Watcher learns your tricks. It will not be deterred again
 - Cannot be stunned for remainder of run
 
 **Escape Window:** After stunning The Watcher, player has 2 turns to reach an extraction point before it recovers. This creates tactical gameplay rather than infinite stun-lock abuse.
+
+### Watcher + Boss Interaction Rules
+
+The Watcher and the Floor 5 boss have special interaction rules to prevent softlocks and undefined behavior:
+
+| Rule | Specification |
+|------|---------------|
+| Spawn Deferral | The Watcher CANNOT spawn during boss encounters |
+| Dread Tracking | Dread can reach 100 during boss fight, but spawn is deferred |
+| Warning Display | At 100 Dread during boss: "The Watcher stirs beyond the threshold..." |
+| Post-Boss Spawn | If Dread was 100+ during boss fight, Watcher spawns immediately after boss defeat |
+| Death Override | If player dies to boss, standard death rules apply (no Watcher spawn) |
+
+**Post-Boss Watcher Mechanics:**
+- Extraction IS available after boss death (boss was the gatekeeper)
+- Watcher blocks extraction until stunned
+- Player must stun Watcher once to escape
+- This is NOT redundant—Watcher adds final challenge after boss
+
+**Thematic Framing:**
+```
+The Bone Colossus falls. Silence. Then—
+The Watcher emerges from the shadows. Your mind called it here.
+You must break its gaze to escape.
+```
+
+**Design Rationale:** The boss room is a sealed arena; thematically, the boss demands full attention. The Watcher's deferred spawn creates a potential "double gauntlet" for players who pushed too hard, rewarding skilled play while punishing greed.
 
 **Design Philosophy:** We corrupt INFORMATION, never INPUT. The player can always act; they just can't trust what they see. The Watcher adds mechanical danger at maximum Dread without taking control away from the player.
 

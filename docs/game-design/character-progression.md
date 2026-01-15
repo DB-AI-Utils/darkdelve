@@ -10,9 +10,34 @@ Only three stats matter. This is intentional—we want decisions in the dungeon,
 
 | Stat | Primary Effect | Secondary Effect |
 |------|----------------|------------------|
-| **VIGOR** | Max HP (+5 per point) | Poison/Bleed resistance |
+| **VIGOR** | Max HP (+5 per point) | Poison/Bleed resistance (see below) |
 | **MIGHT** | Physical damage (+1 per point) | Carry capacity |
 | **CUNNING** | Crit chance (see below) | Special dialogue, loot detection |
+
+### VIGOR DoT Resistance
+
+VIGOR provides percentage-based reduction to damage-over-time effects (Poison, Bleeding):
+
+```
+DoT Resistance = min(VIGOR × 5%, 40%)
+
+Actual DoT Damage = Base DoT × (1 - DoT Resistance)
+
+Soft Cap: 40% (reached at 8 VIGOR)
+```
+
+| VIGOR | Resistance | Poison (3/turn) | Bleed/stack (2/turn) |
+|-------|------------|-----------------|----------------------|
+| 1 | 5% | 2.85 → 3 | 1.9 → 2 |
+| 3 (start) | 15% | 2.55 → 3 | 1.7 → 2 |
+| 5 | 25% | 2.25 → 2 | 1.5 → 2 |
+| 8+ | 40% (cap) | 1.8 → 2 | 1.2 → 1 |
+
+**Design Intent:** VIGOR's secondary effect is noticeable against DoT-heavy enemies but not build-defining. The 40% cap prevents VIGOR stacking from trivializing poison/bleed strategies. This creates meaningful trade-offs:
+- VIGOR build: Survives longer against DoT enemies, excels in multi-combat sequences
+- MIGHT build: Kills faster, takes full DoT damage but ends fights before damage accumulates
+
+**Note:** DoT resistance reduces damage per tick only, NOT duration.
 
 ### CUNNING Crit Scaling (Soft Cap)
 
@@ -172,6 +197,23 @@ To prevent safe XP grinding on early floors with free extraction:
 
 This ensures higher-level characters must engage with deeper, riskier content to progress efficiently. Safe grinding on early floors becomes time-inefficient rather than impossible, preserving player agency while discouraging degenerate play patterns.
 
+### Level-Gated Gold Reduction (Anti-Farming)
+
+Mirrors XP penalty to prevent degenerate gold farming on early floors with free extraction:
+
+| Player Level | Gold Penalty |
+|--------------|--------------|
+| Levels 1-5 | Full gold from all floors |
+| Levels 6-10 | Floor 1 gives 70% gold |
+| Levels 11-15 | Floors 1-2 give 70% gold |
+| Levels 16-20 | Floors 1-3 give 70% gold |
+
+**Implementation:** Multiply gold drops by 0.7 when penalty is active.
+
+**Display:** *"The dungeon's lesser denizens carry little of value."*
+
+**Design Rationale:** XP penalty alone was insufficient—gold farming remained viable for high-level players repeatedly clearing Floors 1-2 with zero extraction cost. The 70% penalty makes this inefficient without making it impossible. Quick raids remain VIABLE (for recovery, casual play) but not OPTIMAL (deep runs still reward more gold per hour).
+
 This prevents the XP grind wall at high levels by making deep runs the most efficient leveling method, aligning with the extraction dilemma (deeper = better rewards).
 
 Levels provide modest power but mainly serve as gating for dungeon access.
@@ -184,10 +226,43 @@ Meta-progression provides both **power growth** (leveling) and **variety expansi
 
 ### Gradual Item Pool Expansion
 
-- First 5 runs: 30-item pool (simple, learnable)
-- After 5 runs: +10 items unlock
-- Each boss killed: +2-3 specific items
-- Full pool: ~100 items
+Item pool expands based on character level only. No achievement system required—level is already tracked.
+
+**Expansion Schedule:**
+
+| Level | Pool Size | New Items | Rationale |
+|-------|-----------|-----------|-----------|
+| 1-4 | 30 items | Base pool | Learn core items |
+| 5-7 | 45 items | +15 general | First milestone |
+| 8-10 | 60 items | +15 general | Mid-game variety |
+| 11-14 | 80 items | +20 general | Late-game depth |
+| 15+ | 100 items | +20 general | Full pool |
+
+**Rarity Entry Schedule:**
+
+| Rarity | Entry Point | Rationale |
+|--------|-------------|-----------|
+| Common | Level 1 | Always available |
+| Uncommon | Level 1 | Core variety |
+| Rare | Level 1 (3 items) | Aspirational from start |
+| Epic | Level 5+ (pool 45) | Reward for progression |
+| Legendary | Level 8+ (pool 60) | True endgame aspiration |
+
+**Base Pool Distribution (30 items):**
+
+| Slot | Common | Uncommon | Rare | Total |
+|------|--------|----------|------|-------|
+| Weapons | 4 | 2 | 1 | 7 |
+| Armor | 3 | 2 | 1 | 6 |
+| Helms | 2 | 2 | 0 | 4 |
+| Accessories | 2 | 2 | 1 | 5 |
+| Consumables | 8 | 0 | 0 | 8 |
+
+**Totals:** Common 19 (63%), Uncommon 8 (27%), Rare 3 (10%), Epic 0, Legendary 0
+
+**Implementation:** On loot generation, filter item templates by `item.minLevel <= character.level`. No achievement tracking, no run counting—just one integer comparison.
+
+**Post-MVP:** Achievement-based unlocks (boss kills, bestiary completion) can add SPECIFIC items as bonuses without replacing this system.
 
 ### Class Unlocks
 
@@ -197,15 +272,22 @@ Meta-progression provides both **power growth** (leveling) and **variety expansi
 |-------|------------------|-----------|
 | Mercenary | Default | Balanced, standard stats |
 | Flagellant | Extract while at 85+ Dread | High risk/reward, damage bonuses at low HP |
-| Hollowed One | Die at 100 Dread on Floor 3+ | Can use cursed items safely, Dread manipulation |
+| Hollowed One | Die to The Watcher on Floor 3+ | Can use cursed items safely, Dread manipulation |
 
 **Class Unlock Clarifications:**
-- **Flagellant:** Uses state tracking - Dread must be 85+ at the moment of extraction, not just at any point during the run. This prevents "spike to 85, reduce with potions, extract safely" cheese strategies.
-- **Hollowed One:** Must die on Floor 3 or deeper to prevent trivial Floor 1 farming. The Floor requirement ensures meaningful investment before unlock.
+- **Flagellant:** Uses state tracking—Dread must be 85+ at the moment of extraction, not just at any point during the run. This prevents "spike to 85, reduce with potions, extract safely" cheese strategies.
+- **Hollowed One:** Must be killed by The Watcher specifically (not just at 100 Dread) on Floor 3 or deeper. This ensures intentional sacrifice and prevents trivial Floor 1 farming. The player must push to 100 Dread, trigger The Watcher, and be defeated by it.
+
+**Expected Unlock Journey:**
+
+| Class | Typical Unlock Run | Player Experience |
+|-------|-------------------|-------------------|
+| Flagellant | Runs 5-10 | Master Dread management, survive at high tension |
+| Hollowed One | Runs 6-10 | Deliberately push to 100 Dread, embrace death |
 
 **Narrative frames:**
 - Flagellant: "You walked the edge and returned. You Awakened."
-- Hollowed One: "The abyss claimed you, but you came back... changed."
+- Hollowed One: "The Watcher's gaze pierced your soul. You fell into the abyss... and found something there."
 
 ### Mutators (Difficulty Modifiers)
 
@@ -260,11 +342,21 @@ This extends the "death as discovery" philosophy — deaths literally teach you 
 
 | Tier | Unlock Condition | Information Unlocked |
 |------|------------------|---------------------|
-| 1 | 8 encounters OR 1 death | Name, HP range, damage range |
-| 2 | 20 encounters OR 2 deaths | Attack patterns, resistances, weaknesses |
-| 3 | 35 encounters OR 3 deaths | Exact stats, optimal strategies, lore entry |
+| 1 | 6 encounters OR 1 death | Name, HP range, damage range |
+| 2 | 15 encounters OR 2 deaths | Attack patterns, resistances, weaknesses |
+| 3 | 25 encounters OR 3 deaths | Exact stats, optimal strategies, lore entry |
 
-**Death-Linked Acceleration:** Deaths to an enemy type accelerate knowledge unlocks, making death feel productive. A player who dies once to Ghouls immediately learns their basic stats, while a cautious player needs 8 encounters.
+**Timeline by Playstyle (per enemy type):**
+
+| Playstyle | Tier 1 | Tier 2 | Tier 3 |
+|-----------|--------|--------|--------|
+| Careful (rarely dies) | Run 1-2 | Runs 3-5 | Runs 6-10 |
+| Average (dies sometimes) | Run 1 | Runs 2-3 | Runs 4-6 |
+| Aggressive (dies often) | Run 1 (death) | Runs 2-3 (deaths) | Runs 3-4 (deaths) |
+
+**Death-Linked Acceleration:** Deaths to an enemy type accelerate knowledge unlocks, making death feel productive. A player who dies once to Ghouls immediately learns their basic stats, while a cautious player needs 6 encounters.
+
+**Display in Chronicler:** Unlock source is tracked—"Learned through experience" vs "Learned through sacrifice."
 
 ### Boss Knowledge
 

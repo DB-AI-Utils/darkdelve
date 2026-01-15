@@ -8,6 +8,60 @@ Turn-based combat with stamina management. Fast, tactical, and always risky.
 
 ---
 
+## Turn Order System
+
+Combat uses **Player-First Default with Speed Exceptions**.
+
+### Default Turn Structure
+
+```
+Standard Turn Cycle:
+  A. Start of Turn
+     - Status effects tick (Poison, Bleed damage)
+     - Stamina regenerates (+2)
+     - Buffs/debuffs duration decrements
+  B. Player Action Phase
+     - Player selects and executes action
+  C. Enemy Action Phase
+     - Enemy executes action
+  D. End of Turn
+     - Check for combat end (0 HP)
+     - Increment turn counter
+```
+
+### Enemy Speed Effects
+
+| Speed | Turn 1 Behavior | After Turn 1 | Additional Effect |
+|-------|-----------------|--------------|-------------------|
+| SLOW | Player first | Normal | +25% damage taken from Heavy Attack |
+| NORMAL | Player first | Normal | Standard combat |
+| FAST | Enemy first-strike, then player | Normal | - |
+| AMBUSH | Enemy gets 2 free actions, then player | Normal | Cannot flee Turn 1 |
+
+**First-Strike (FAST enemies):** Enemy attacks BEFORE player's first action on Turn 1 only. Display: "The Plague Rat lunges before you can react!"
+
+**Ambush (Shadow Stalker):** Enemy gets TWO free actions before combat begins. Player cannot flee on Turn 1.
+
+### Speed by Enemy Type
+
+| Enemy | Speed | First Turn |
+|-------|-------|------------|
+| Plague Rat | Fast | Enemy first-strike |
+| Ghoul, Skeleton Archer, Bone Knight | Normal | Player first |
+| Armored Ghoul, Corpse Shambler, Fleshweaver | Slow | Player first |
+| Shadow Stalker | Fast + Ambush | 2x enemy actions |
+| Bone Colossus (Boss) | Slow | Player first |
+
+### Stagger and Stun Effects
+
+**Staggered (enemy):** Enemy skips their next action phase. One-time skip, does not affect subsequent turns.
+
+**Stunned (player):** Player skips their action phase. Enemy acts, then turn ends. Player recovers automatically.
+
+**Boss Stagger Resistance:** Bosses require 2 staggers within 3 turns to trigger stagger effect.
+
+---
+
 ## Combat Interface
 
 ```
@@ -57,8 +111,21 @@ Turn-based combat with stamina management. Fast, tactical, and always risky.
 
 - Light Attack spam: 4 Stam = 4 attacks = 4x base damage over 2 turns
 - Heavy Attack: 3 Stam = 1 attack = 2x base damage + 50% stagger + armor pen
-- Heavy wins when: Enemy has armor, or stagger breaks enemy combo
+- Heavy wins when: Enemy has armor, or stagger breaks enemy combo, or enemy is SLOW
 - Light wins when: Need consistent damage, enemy has no armor
+
+**Balance Validation (v1.5):**
+
+Heavy Attack is intentionally weaker against unarmored enemies (~83% damage efficiency vs Light spam). This creates correct tactical choices:
+
+| Situation | Light Efficiency | Heavy Efficiency | Preferred |
+|-----------|------------------|------------------|-----------|
+| Unarmored, Normal speed | 100% | 83% | Light (intended) |
+| 15% Armor (Armored Ghoul) | 85% | 177% | Heavy |
+| 25% Armor (Bone Knight) | 75% | 171% | Heavy |
+| SLOW enemy (any armor) | 100% | 104-221% | Heavy |
+
+**Target Usage Rate:** 20-40% of combat actions should be Heavy Attack. If playtesting shows <20%, consider graduated buffs (see [Reference Numbers](reference-numbers.md#balance-validation-checklist)).
 
 ### Block vs Dodge Trade-off
 
@@ -116,7 +183,7 @@ Status effects can cascade dangerously. Poisoned + Bleeding can kill faster than
 ### Damage Calculation
 
 ```
-Final Damage = (Weapon Base + MIGHT Bonus) x Skill Multiplier x (1 + Bonus%) x Crit Multiplier
+Final Damage = (Weapon Base + MIGHT Bonus) x Skill Multiplier x (1 + Bonus%) x Crit Multiplier x (1 - Effective Armor%)
 
 Where:
 - Weapon Base: The weapon's base damage range (e.g., 5-8 for starter weapon)
@@ -124,7 +191,58 @@ Where:
 - Skill Multiplier: 1.0 for Light Attack, 2.0 for Heavy Attack
 - Bonus%: Sum of all additive damage bonuses (item effects, buffs)
 - Crit Multiplier: 2.0 on critical hit, 1.0 otherwise
+- Effective Armor%: See Armor System below
 ```
+
+### Armor System
+
+Armor provides percentage-based damage reduction. Armor penetration reduces the effectiveness of armor.
+
+```
+ARMOR FORMULA
+=============
+
+Effective Armor% = Base Armor% × (1 - Armor Penetration%)
+
+Damage After Armor = Raw Damage × (1 - Effective Armor%)
+
+Rounding: Always round to nearest integer (0.5 rounds up)
+Minimum Effective Armor: 0% (penetration cannot make armor negative)
+```
+
+**Enemy Armor Values:**
+
+| Enemy | Base Armor | vs Light Attack | vs Heavy Attack (25% pen) |
+|-------|------------|-----------------|---------------------------|
+| Armored Ghoul | 15% | 15% reduction | 11.25% reduction |
+| Bone Knight | 25% | 25% reduction | 18.75% reduction |
+
+**Worked Examples:**
+
+*Light Attack vs Bone Knight (9 base damage):*
+```
+Effective Armor: 25% × (1 - 0%) = 25%
+Final Damage: 9 × (1 - 0.25) = 6.75 → 7 damage
+```
+
+*Heavy Attack vs Bone Knight (18 base damage, 25% pen):*
+```
+Effective Armor: 25% × (1 - 0.25) = 18.75%
+Final Damage: 18 × (1 - 0.1875) = 14.625 → 15 damage
+```
+
+**Player Armor from Gear:**
+
+Players do NOT have a base armor stat. Armor is gained ONLY from gear effects.
+
+| Rarity | Armor Range | Example |
+|--------|-------------|---------|
+| Common | 5-10% | Tattered Leathers: +5 HP, no armor |
+| Uncommon | 10-15% | Chainmail: +8 HP, 10% armor |
+| Rare | 15-20% | Plate Cuirass: +10 HP, 18% armor |
+| Legendary | 20-25% | Unique effects |
+
+**Player Armor Cap:** 40% (hard cap from all sources combined)
 
 ### Example Calculation (Starter Mercenary vs Plague Rat)
 

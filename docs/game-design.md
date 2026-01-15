@@ -18,10 +18,11 @@
 ### Detailed System Documents
 - [The Extraction System](game-design/extraction-system.md) - Push-your-luck extraction mechanics
 - [The Dread System](game-design/dread-system.md) - Mental strain, unreliable narrator, The Watcher
-- [Combat](game-design/combat.md) - Stamina-based turn combat, status effects, flee mechanics
+- [Combat](game-design/combat.md) - Stamina-based turn combat, turn order, status effects, flee mechanics
 - [Character & Progression](game-design/character-progression.md) - Stats, gear, stash, veteran knowledge
+- [Item System](game-design/items.md) - Item schema, effects, identification mechanics
 - [Save System](game-design/save-system.md) - Auto-save triggers, persistence rules
-- [Dungeon Structure](game-design/dungeon-structure.md) - Floors, rooms, ASCII maps, pre-boss warnings
+- [Dungeon Structure](game-design/dungeon-structure.md) - Room navigation, floor transitions, ASCII maps
 - [Dungeon Generation](game-design/dungeon-generation.md) - Hybrid procedural generation
 - [Death & Discovery](game-design/death-discovery.md) - Death economy, The Chronicler, unlocks
 - [Camp System](game-design/camp-system.md) - Full UI specification, menus, expedition flow
@@ -391,7 +392,7 @@ Research shows 3 enemy types is a SEVERE content gap. Target 8-10 minimum:
 
 ---
 
-*Document version: 1.4*
-*Last updated: 2026-01-15 — Features deferred to post-MVP: Bounty Board, Item Affixes, Events, Mimics*
+*Document version: 1.5*
+*Last updated: 2026-01-15 — Resolved: Room Navigation, Turn Order, Floor Transitions, Item Schema, Armor Formula, VIGOR Resistance, Heavy Attack Validation, Veteran Knowledge Thresholds, Item Pool Expansion, Hollowed One Unlock, Watcher+Boss Interaction, Death Dread Formula, Floor 1-2 Farming*
 
 → *Full changelog: [Reference Numbers](game-design/reference-numbers.md#changelog)*

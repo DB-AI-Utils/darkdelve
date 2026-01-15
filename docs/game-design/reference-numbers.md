@@ -134,6 +134,17 @@ TOTAL CRIT CAP: 65% (from all sources combined)
 | 11-15 | 50% | 50% | 100% |
 | 16-20 | 50% | 50% | 50% |
 
+**Level-Gated Gold Reduction (Anti-Farming):**
+
+| Player Level | Floor 1 | Floor 2 | Floors 3-5 |
+|--------------|---------|---------|------------|
+| 1-5 | 100% | 100% | 100% |
+| 6-10 | 70% | 100% | 100% |
+| 11-15 | 70% | 70% | 100% |
+| 16-20 | 70% | 70% | 70% |
+
+→ *Full details: [Character & Progression](character-progression.md#level-gated-gold-reduction-anti-farming)*
+
 ### Boss Design for Underpowered Players
 
 The boss uses soft gating rather than hard level requirements:
@@ -327,6 +338,124 @@ Use these metrics during playtesting:
 ---
 
 ## Changelog
+
+### v1.5 (2026-01-15)
+
+Resolved all blockers and HIGH-PRIORITY concerns. Includes game designer blockers (Room Navigation, Turn Order, Floor Transitions, Item Schema), game-balance-tuner blockers (Armor Formula, VIGOR Resistance), progression-pacing-auditor blockers (Veteran Knowledge, Item Pool, Hollowed One), and mechanics-auditor concerns (Watcher+Boss, Death Dread, Floor Farming). Validated Heavy Attack balance. Added comprehensive specifications to enable engineer implementation.
+
+*Watcher + Boss Interaction (Concern #1):*
+- **Problem:** Undefined behavior if player reaches 100 Dread during Floor 5 boss fight
+- **Resolution:** Added Watcher + Boss Interaction Rules to `dread-system.md`
+- **Rule:** Watcher CANNOT spawn during boss encounters; spawn deferred until post-boss
+- **Post-Boss:** If Dread was 100+ during fight, Watcher spawns immediately after boss defeat
+- **Mechanics:** Extraction available after boss; Watcher blocks until stunned once
+- **Thematic:** "Double gauntlet" rewards skilled play, punishes excessive greed
+
+*Death Dread Perverse Incentive (Concern #2):*
+- **Problem:** Death reset Dread to 10 while extraction gave EndDread-25, making death optimal at high Dread
+- **Resolution:** Unified formulas in `dread-system.md`
+- **New Rule:** Death applies `EndDread - 25 (min 10)` same as extraction
+- **Result:** Death penalty is item/gold loss only; Dread management no longer incentivizes dying
+
+*Floor 1-2 Farming (Concern #3):*
+- **Problem:** Free extraction + only XP penalty meant gold farming remained viable
+- **Resolution:** Added Level-Gated Gold Reduction to `character-progression.md` and `reference-numbers.md`
+- **Gold Penalty:** 70% gold at Level 6+ for early floors (mirrors XP penalty pattern)
+- **Result:** Quick raids remain viable but not optimal; deep runs properly incentivized
+
+*Veteran Knowledge Thresholds (Blocker #6):*
+- **Problem:** Inconsistent thresholds documented (8/20/35 vs 5/15/25 encounters)
+- **Resolution:** Adopted hybrid 6/15/25 encounters OR 1/2/3 deaths
+- **Tier 1:** 6 encounters OR 1 death (achievable in ~1 run)
+- **Tier 2:** 15 encounters OR 2 deaths (2-3 runs or 2 deaths)
+- **Tier 3:** 25 encounters OR 3 deaths (4-6 runs for average player)
+- **Rationale:** Requires deliberate engagement, respects player time, preserves death acceleration for "death as discovery"
+- Updated `character-progression.md` and `CLAUDE.md`
+
+*Item Pool Expansion Schedule (Blocker #8):*
+- **Problem:** Vague expansion milestones (30→100 items undefined)
+- **Resolution:** Level-based expansion only (no achievement system for MVP)
+- **Schedule:** 30 (L1-4) → 45 (L5-7) → 60 (L8-10) → 80 (L11-14) → 100 (L15+)
+- **Base pool:** 30 items (19 Common, 8 Uncommon, 3 Rare) across all slots
+- **Rarity gates:** Epic at Level 5+, Legendary at Level 8+
+- **Implementation:** `item.minLevel <= character.level` - single integer comparison
+- Added full expansion schedule and base pool distribution to `character-progression.md`
+
+*Hollowed One Unlock (Concern #4):*
+- **Problem:** "Die at 100 Dread on Floor 3+" nearly impossible (Watcher one-shots at 100 Dread)
+- **Resolution:** Changed to "Die to The Watcher on Floor 3+"
+- **Journey:** Runs 6-10, player deliberately pushes to 100 Dread, triggers Watcher, is defeated
+- **Thematic:** "The Watcher's gaze pierced your soul. You fell into the abyss... and found something there."
+- Updated unlock condition and narrative in `character-progression.md`
+
+*Armor System (Blocker #3):*
+- **Formula:** `Effective Armor% = Base Armor% × (1 - Armor Penetration%)`
+- **Damage After Armor:** `Raw Damage × (1 - Effective Armor%)`
+- **Heavy Attack Penetration:** 25% pen reduces enemy armor multiplicatively (25% armor → 18.75% effective)
+- **Player Armor:** From gear only (no base stat)
+  - Common: 5-10%, Uncommon: 10-15%, Rare: 15-20%, Legendary: 20-25%
+- **Player Armor Cap:** 40% hard cap from all sources
+- **Rounding:** Nearest integer (0.5 rounds up)
+- Added full specification to `combat.md` Combat Balance Formulas section
+
+*VIGOR DoT Resistance (Blocker #7):*
+- **Formula:** `DoT Resistance = min(VIGOR × 5%, 40%)`
+- **Application:** `Actual DoT = Base DoT × (1 - DoT Resistance)`
+- **Soft Cap:** 40% at 8 VIGOR
+- **Affects:** Poison damage, Bleeding damage (damage per tick only, NOT duration)
+- **Rationale:** Percentage reduction scales with damage, never fully negates, simple mental math
+- Added VIGOR DoT Resistance section to `character-progression.md`
+
+*Heavy Attack Balance Validation (Concern #5):*
+- **Conclusion:** No change needed—current design is correct
+- **Analysis:** Heavy intentionally weaker vs unarmored (83% efficiency), strongly outperforms vs armored (171-177%) and SLOW (104-221%)
+- **Design Intent:** Creates correct tactical decisions—Light spam for unarmored, Heavy for armored/SLOW
+- **Monitoring:** If playtesting shows <20% Heavy usage, graduated fixes documented in combat.md
+- Added Balance Validation table to `combat.md` Heavy Attack section
+
+*Room Navigation System (Blocker #1):*
+- **Model:** Corridor-based graph (not grid). Each room has explicit connections to other rooms.
+- **Input:** Numbered corridor selection ([1] North -> [TREASURE], [2] East -> [COMBAT], etc.)
+- **Backtracking:** Allowed to CLEARED rooms only. Costs 1 turn. Blocked through uncleared rooms.
+- **Room States:** UNEXPLORED (shows ?), ENTERED (in progress), CLEARED (safe passage)
+- **Entry Behavior:** COMBAT rooms begin combat immediately. TREASURE/EVENT/REST show choice menu.
+- **Dread Corruption:** Affects display only. 50+ Dread: 5% wrong room type. 70+ Dread: 30% hidden. 85+ Dread: all [?????].
+- Added full specification to `dungeon-structure.md`
+
+*Turn Order in Combat (Blocker #2):*
+- **Default:** Player-first. Player acts, then enemy acts, each turn.
+- **SLOW enemies:** Player first. +25% damage from Heavy Attack (off-balance).
+- **NORMAL enemies:** Player first. Standard combat.
+- **FAST enemies:** First-strike on Turn 1 only (enemy attacks before player). Normal order after.
+- **AMBUSH (Shadow Stalker):** Enemy gets 2 free actions before Turn 1. Cannot flee Turn 1.
+- **Status Effects:** Process at START of turn. Staggered enemy skips action. Stunned player skips action.
+- **Boss:** Standard player-first. Pattern attacks (3-turn cycle) not affected by speed.
+- Added Turn Order System section to `combat.md`
+
+*Floor Transition Mechanics (Blocker #4):*
+- **Stairwell Room:** Each floor has exactly one. Contains stairs down + extraction point (except Floor 5).
+- **Descent Conditions:** Available immediately on entering Stairwell. No minimum room clear.
+- **One-Way:** Cannot return to previous floors. "The stairs crumble behind you."
+- **Dread Cost:** +5 Dread on descent, applied before first room of new floor.
+- **Blocked When:** The Watcher active, or in combat.
+- **Floor 5:** No descent (boss floor). Boss room is only exit.
+- Added Floor Transition System section to `dungeon-structure.md`
+
+*Item Data Schema (Blocker #5):*
+- **Core Fields:** id, templateId, slot, rarity, identified, names, flavorText, baseStats, effects, consumable, cursed, questItem
+- **Stat Block:** damageMin/Max, bonusHP, armor, vigor/might/cunning bonuses
+- **Effect System:** Typed effects (STAT_BONUS, CRIT_CHANCE, LIFESTEAL, ON_HIT_POISON, CURSE_DREAD_GAIN, etc.)
+- **Effect Structure:** type, magnitude, duration, chance, description, hiddenUntilIdentified
+- **Consumable Data:** uses, useInCombat, useOutOfCombat flags
+- **Identification:** Reveals true name, stats, effects, cursed status. Cost: 25g or ID Scroll.
+- **Dread Corruption:** Display-only. 50+ shows ranges, 70+ shows wrong values 15%, 85+ shows ??? 25%.
+- **Save Schema:** Minimal (id, templateId, identified). All other data derived from template.
+- Created new `items.md` document with complete specification
+
+*Document Updates:*
+- Added `items.md` to Table of Contents in main game-design.md
+- Updated dungeon-structure.md description to mention room navigation and floor transitions
+- Updated combat.md description to mention turn order
 
 ### v1.4 (2026-01-15)
 
