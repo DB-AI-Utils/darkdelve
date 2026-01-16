@@ -367,13 +367,15 @@ interface DeathEconomyService {
   previewDeathOutcome(params: DeathParams): DeathPreview;
 
   /**
-   * Get item's death risk status
+   * Get item's death risk status.
+   * Note: broughtFromStash parameter is redundant if item.source === 'brought',
+   * but kept for explicitness when caller has already resolved this.
    */
   getItemDeathRisk(
     item: ItemInstance,
     isEquipped: boolean,
     broughtFromStash: boolean
-  ): DeathRiskStatus;
+  ): ItemRiskStatus;
 }
 
 interface DeathParams {
@@ -463,12 +465,8 @@ type PreservedItemReason =
   | 'starting_gear'          // Class starting equipment - never lost
   | 'equipped_identified';   // Priority 2: Equipped AND identified
 
-type DeathRiskStatus =
-  | 'safe'        // Starting gear - cannot be lost
-  | 'protected'   // Equipped + identified - survives death
-  | 'vulnerable'  // Equipped but unidentified - lost on death
-  | 'at_risk'     // Brought from stash - always lost on death
-  | 'doomed';     // Carried (not equipped) - lost on death
+// ItemRiskStatus imported from 07-item-system (canonical definition)
+// See ItemService for type definition and status determination logic
 
 interface DeathSummary {
   totalItemsLost: number;
@@ -1460,7 +1458,7 @@ export type {
   PreservedItemDetail,
   LostItemReason,
   PreservedItemReason,
-  DeathRiskStatus,
+  // Note: ItemRiskStatus is imported from 07-item-system, not re-exported here
   DeathSummary,
   LessonLearnedInfo,
   LessonLearnedDecrementResult,

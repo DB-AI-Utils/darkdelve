@@ -11,8 +11,10 @@ Only three stats matter. This is intentional—we want decisions in the dungeon,
 | Stat | Primary Effect | Secondary Effect |
 |------|----------------|------------------|
 | **VIGOR** | Max HP (+5 per point) | Poison/Bleed resistance (see below) |
-| **MIGHT** | Physical damage (+1 per point) | Carry capacity |
+| **MIGHT** | Physical damage (+1 per point) | — |
 | **CUNNING** | Crit chance (see below) | Special dialogue, loot detection |
+
+**Design Note (MIGHT):** MIGHT intentionally has no secondary effect. Unlike VIGOR's subtle DoT resistance and CUNNING's probabilistic crit scaling, MIGHT's +1 damage per point is *directly felt every attack*. This makes MIGHT the "what you see is what you get" stat — straightforward power without hidden complexity. Adding carry capacity would introduce pre-dungeon optimization ("How much MIGHT do I need for inventory?") that conflicts with the design philosophy of "decisions in the dungeon, not in menus." Fixed 8-slot inventory preserves gear tension.
 
 ### VIGOR DoT Resistance
 

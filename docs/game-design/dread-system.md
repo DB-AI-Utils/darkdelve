@@ -17,16 +17,7 @@ DREAD: ████████░░░░░░░░░░░░ 40/100
 
 ## Starting Dread
 
-**First-ever run:** Characters begin at **0 Dread** (blissfully ignorant).
-
-**Subsequent runs:** Dread persists between runs. Resting at camp reduces Dread by 25 but cannot go below 10. Experienced adventurers can never fully forget the dungeon's horrors.
-
-**Run Start Dread Calculation:**
-- First run ever: 0 Dread
-- After extraction: Previous run's end Dread, then apply rest (-25, min 10)
-- After death: Previous run's end Dread -25 (min 10) — same as extraction
-
-**Design Note:** Death and extraction now have identical Dread recovery. Death's penalty is purely item/gold loss, not Dread management. This prevents the perverse incentive where dying at high Dread was mechanically optimal for Dread reset.
+Every run begins at **0 Dread**. The dungeon's horrors fade with distance—but return in full once you descend again.
 
 ---
 
@@ -54,11 +45,10 @@ Pure combat Dread per standard run (F1-4) is approximately 25-30 points. To reac
 
 ## Dread Recovery
 
-*Camp no longer fully resets Dread - some persistence creates strategic decisions.*
+*Within a run, Dread can be reduced through consumables and shrine blessings.*
 
 | Method | Dread Loss | Notes |
 |--------|------------|-------|
-| Rest at camp | -25 (min 10) | Cannot reduce below 10 |
 | Torch (consumable) | -5 Dread gain | For 1 floor duration |
 | Shrine blessing | -15 | With tradeoff |
 | Calm Draught | -15 | Always available (18g) |

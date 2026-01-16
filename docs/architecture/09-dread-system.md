@@ -780,7 +780,7 @@ interface DreadInternalState {
 
 | Case | Handling |
 |------|----------|
-| Rest at camp, Dread at 0 | No change (can't go below 10 on subsequent runs) |
+| Recovery at Dread 0 | No change (already at minimum) |
 | Use multiple recovery items same turn | All apply, stack normally |
 | Torch active + Dread recovery item | Apply reduction modifier to item's effect |
 | Recovery exceeds negative Dread | Clamp at 0 |

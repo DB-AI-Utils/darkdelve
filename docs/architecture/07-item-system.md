@@ -75,14 +75,24 @@ interface ResolvedItem {
 }
 
 /**
- * Item's risk status for death economy display
+ * Item's risk status for death economy display.
+ *
+ * CANONICAL TYPE: This is the authoritative definition.
+ * ExtractionSystem (11) imports this type rather than defining its own.
+ *
+ * Status determination priority (highest to lowest):
+ * 1. source === 'starting' → 'safe' (starting gear always preserved)
+ * 2. source === 'brought' → 'at_risk' (brought from stash, always lost)
+ * 3. !isEquipped → 'doomed' (carried items always lost)
+ * 4. !identified → 'vulnerable' (equipped but unidentified, lost)
+ * 5. identified → 'protected' (equipped + identified, survives)
  */
 type ItemRiskStatus =
-  | 'safe'        // Starting gear OR equipped+identified
-  | 'at_risk'     // Found/purchased, unidentified
-  | 'protected'   // Found/purchased, equipped+identified
-  | 'vulnerable'  // Found/purchased, identified but NOT equipped
-  | 'doomed';     // Brought from stash - lost on death regardless
+  | 'safe'        // Starting gear - cannot be lost
+  | 'protected'   // Equipped + identified - survives death
+  | 'vulnerable'  // Equipped but unidentified - lost on death
+  | 'at_risk'     // Brought from stash - always lost on death
+  | 'doomed';     // Carried (not equipped) - lost on death
 ```
 
 ### Item Service

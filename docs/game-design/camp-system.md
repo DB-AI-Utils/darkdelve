@@ -60,7 +60,7 @@ Menu ordering matches post-run player intent: stash loot → check upgrades → 
 - **Gold:** Affects merchant, extraction costs
 - **Level + XP:** Progress visibility creates "one more run" motivation
 - **Stash count:** Alerts player to manage overflow
-- **Dread:** Only shown if above 0 (experienced adventurers have minimum 10 Dread; first-timers start at 0)
+- **Dread:** Only shown if above 0 (all runs start at 0 Dread)
 
 ---
 

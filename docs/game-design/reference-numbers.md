@@ -377,6 +377,23 @@ Use these metrics during playtesting:
 
 ## Changelog
 
+### v1.9 (2026-01-16)
+
+**Dread persistence removed.** Simplification based on design review.
+
+- **Change:** Dread now resets to 0 at the start of every run (no cross-run persistence)
+- **Removed:** Camp rest Dread reduction (-25, min 10) - no longer relevant
+- **Removed:** "Min 10 Dread for experienced adventurers" rule
+- **Rationale:** Persistence added complexity without proportional gameplay benefit. Within-run Dread escalation provides sufficient tension. Session-based play (5-30 min runs) doesn't suit cross-session mental state tracking.
+- **Files updated:** `dread-system.md`, `camp-system.md`, `reference-numbers.md`, architecture `09-dread-system.md`
+
+**MIGHT secondary effect removed.** Architecture alignment — Issue #9 resolved.
+
+- **Change:** MIGHT's secondary effect "Carry capacity" removed from stat table
+- **Rationale:** The secondary effect was never specified (no formula, scaling, or cap — unlike VIGOR's DoT resistance and CUNNING's crit scaling). Implementing variable inventory capacity would conflict with explicit "8 slots" statement, add pre-dungeon optimization contrary to design philosophy, and require significant scope.
+- **MIGHT remains valuable:** +1 damage per point is directly felt every attack.
+- **Files updated:** `character-progression.md` (stat table + design note added)
+
 ### v1.8 (2026-01-15)
 
 **Pre-implementation blocker resolution.** Red Team audit identified ambiguities; resolved before Architect phase.
@@ -582,10 +599,9 @@ Resolved all blockers and HIGH-PRIORITY concerns. Includes game designer blocker
 - **Thematic:** "Double gauntlet" rewards skilled play, punishes excessive greed
 
 *Death Dread Perverse Incentive (Concern #2):*
-- **Problem:** Death reset Dread to 10 while extraction gave EndDread-25, making death optimal at high Dread
-- **Resolution:** Unified formulas in `dread-system.md`
-- **New Rule:** Death applies `EndDread - 25 (min 10)` same as extraction
-- **Result:** Death penalty is item/gold loss only; Dread management no longer incentivizes dying
+- **Problem:** Originally, death reset Dread to 10 while extraction gave EndDread-25, making death optimal at high Dread
+- **Resolution:** Dread now resets to 0 at the start of every run (no persistence between runs)
+- **Result:** Death penalty is item/gold loss only; Dread management is purely within-run
 
 *Floor 1-2 Farming (Concern #3):*
 - **Problem:** Free extraction + only XP penalty meant gold farming remained viable
@@ -761,7 +777,7 @@ Resolved blockers 3-9 and Floor 3 Difficulty Spike. Completed full 10-enemy MVP 
 - Defined main menu structure with intent-based ordering (Stash → Equipment → Begin Expedition)
 - Added global navigation rules: [B] back, [ESC] camp return, [?] help
 - Specified status bar: Gold, Level, XP progress, Stash count, Dread (conditionally shown if > 0)
-- Clarified Starting Dread rules: 0 for first run, min 10 for experienced players, death resets to 10
+- Clarified Starting Dread rules: 0 Dread at the start of every run (no persistence)
 - Added two-stage expedition flow: preparation screen with Quick-Equip + final confirmation
 - Full submenu specifications: Stash, Equipment, Merchant, Chronicler, Character
 - Added pagination rules for lists exceeding 9 items

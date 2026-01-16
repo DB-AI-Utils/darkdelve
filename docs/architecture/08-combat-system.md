@@ -181,6 +181,9 @@ interface PlayerCombatState {
   /** Did player dodge this turn? (avoids one attack) */
   readonly isDodging: boolean;
 
+  /** Bonus stamina to add next turn (from dodge) */
+  readonly bonusStaminaNextTurn: number;
+
   /** Is player stunned? */
   readonly isStunned: boolean;
 
@@ -494,8 +497,9 @@ interface StaminaManager {
 
   /**
    * Regenerate stamina at start of turn.
+   * Includes base regen (2) plus any bonus from previous turn's dodge (+1).
    */
-  regenerate(currentStamina: number, maxStamina: number): number;
+  regenerate(currentStamina: number, maxStamina: number, bonusStamina: number): number;
 
   /**
    * Get stamina cost for an action.
@@ -504,9 +508,10 @@ interface StaminaManager {
 }
 
 interface StaminaConfig {
-  readonly maxStamina: number;           // 5
+  readonly maxStamina: number;           // 4
   readonly staminaRegenBase: number;     // 2
   readonly staminaRegenOnPass: number;   // 2 (same as base, but explicit)
+  readonly dodgeStaminaBonus: number;    // 1 (bonus stamina next turn after dodge)
 }
 ```
 
@@ -1017,9 +1022,10 @@ function createStaggerResolver(config: CombatConfig): StaggerResolver;
 
 ```json
 {
-  "maxStamina": 5,
+  "maxStamina": 4,
   "staminaRegenBase": 2,
   "staminaRegenOnPass": 2,
+  "dodgeStaminaBonus": 1,
 
   "lightAttackCost": 1,
   "heavyAttackCost": 3,
@@ -1312,7 +1318,9 @@ property("DoT damage scales with stacks for bleed", (stacks) => {
 2. processStartOfTurn()
    - Tick status effects (damage, duration)
    - Check for DoT kills
-   - Regenerate stamina
+   - Regenerate stamina (base + bonus from dodge if applicable)
+   - Apply bonus stamina from previous turn's dodge (+1)
+   - Clear bonus stamina counter
    - Decrement buff durations
    - Clear blocking/dodging flags
 

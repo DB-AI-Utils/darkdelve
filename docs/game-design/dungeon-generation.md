@@ -51,14 +51,14 @@ Higher Dread increases unpredictability — the longer you stay, the wilder thin
 | Dread Level | Effect on Dungeon |
 |-------------|-------------------|
 | 0-25% | Standard variance, predictable runs |
-| 26-50% | Elite spawn chance increases (+10%), dangerous events more likely |
+| 26-50% | Elite spawn chance increases (+10%) |
 | 51-75% | New enemy variants appear, treasure quality increases |
 | 76-100% | "Twisted" room variants possible, maximum chaos + maximum reward |
 
 ### Concrete Numbers
 
 - Elite spawn chance: `5% base + (Dread% × 0.2)` = 5% at 0 Dread, 25% at 100 Dread
-- Dangerous event weight: `1.0 base + (Dread% × 0.02)` = 1x at 0 Dread, 3x at 100 Dread
+- Dangerous event weight: Equal weight (Dread-based weighting deferred to Phase 2)
 - Loot quality bonus: `+0% base + (Dread% × 0.5)` = +50% at max Dread
 
 This creates the extraction dilemma organically: *"Stay longer for better loot, but the dungeon becomes less predictable."*
@@ -91,7 +91,7 @@ To avoid "seed exhaustion" (players seeing all variants quickly):
 
 - Multiple room templates per type
 - Enemy modifiers and elite variants
-- Dread-influenced spawning
+- Dread-based event danger weighting (`1.0 + (Dread% × 0.02)` formula)
 - Curated event pools with theming
 
 ### Phase 3: Narrative Integration

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Provides character creation, stat calculation, leveling, and derived value computation. This module owns all character-related business logic including HP calculation, damage computation, critical hit chance with diminishing returns, and DoT resistance.
+Provides character creation, stat calculation, leveling, derived value computation, and veteran knowledge tracking. This module owns all character-related business logic including HP calculation, damage computation, critical hit chance with diminishing returns, DoT resistance, and monster knowledge progression.
 
 ---
 
@@ -14,14 +14,18 @@ Provides character creation, stat calculation, leveling, and derived value compu
 4. Apply equipment stat bonuses to base stats
 5. Validate stat changes and enforce caps
 6. Provide character state queries for combat and UI
+7. **Track monster encounters and deaths for Veteran Knowledge system**
+8. **Evaluate knowledge tier unlock conditions**
+9. **Provide monster information revelation based on knowledge tier**
 
 ---
 
 ## Dependencies
 
 - **01-foundation**: Types (StatBlock, StatName, CharacterClass, NumericRange, Result), utility functions (clamp)
-- **02-content-registry**: ClassDefinition, ItemTemplate, ProgressionConfig
-- **03-state-management**: CharacterState, EquipmentState, EquippedItem
+- **02-content-registry**: ClassDefinition, ItemTemplate, MonsterTemplate, ProgressionConfig
+- **03-state-management**: CharacterState, EquipmentState, EquippedItem, VeteranKnowledgeState, MonsterKnowledge, GameState, StateStore
+- **04-event-system**: EventBus, CombatStartedEvent, EnemyKilledEvent, PlayerKilledEvent (for KnowledgeService)
 
 ---
 
@@ -165,6 +169,216 @@ interface CharacterService {
  * Create character service instance
  */
 function createCharacterService(config: ProgressionConfig): CharacterService;
+```
+
+### Knowledge Service
+
+```typescript
+// ==================== Knowledge Service ====================
+
+/**
+ * Manages Veteran Knowledge progression - permanent information unlocks
+ * from combat experience. You get smarter, not stronger.
+ *
+ * This service subscribes to combat events and manages:
+ * - Monster encounter tracking
+ * - Death-to-monster tracking
+ * - Tier unlock evaluation and dispatch
+ * - Information revelation queries
+ */
+interface KnowledgeService {
+  // === Initialization ===
+
+  /**
+   * Initialize service and subscribe to combat events.
+   * Must be called once during game startup.
+   *
+   * Subscribes to:
+   * - COMBAT_STARTED: Increment encounter counter
+   * - PLAYER_KILLED: Increment death counter, check tier unlocks
+   * - ENEMY_KILLED: Check tier unlocks after encounter increment
+   */
+  initialize(eventBus: EventBus, stateStore: StateStore): void;
+
+  /**
+   * Cleanup subscriptions (for testing or shutdown)
+   */
+  destroy(): void;
+
+  // === Knowledge Queries ===
+
+  /**
+   * Get current knowledge tier for a monster (0-3).
+   * Tier 0 = never encountered.
+   */
+  getMonsterKnowledge(state: GameState, monsterId: string): MonsterKnowledge;
+
+  /**
+   * Get all veteran knowledge data (for Chronicler display).
+   */
+  getAllKnowledge(state: GameState): VeteranKnowledgeState;
+
+  /**
+   * Check if a specific tier is unlocked for a monster.
+   */
+  isTierUnlocked(state: GameState, monsterId: string, tier: 1 | 2 | 3): boolean;
+
+  /**
+   * Get information revealed at current knowledge tier.
+   * Returns what info should be shown based on accumulated knowledge.
+   *
+   * Tier 0: Nothing (only "???")
+   * Tier 1: Name, HP range, damage range
+   * Tier 2: Attack patterns, resistances, weaknesses
+   * Tier 3: Exact stats, optimal strategies, lore entry
+   */
+  getRevealedInfo(
+    state: GameState,
+    monsterId: string,
+    registry: ContentRegistry
+  ): MonsterRevealedInfo;
+
+  /**
+   * Get knowledge tier thresholds for display.
+   */
+  getTierThresholds(): KnowledgeTierThresholds;
+
+  // === Progress Queries ===
+
+  /**
+   * Get progress toward next tier for a monster.
+   * Returns null if already at tier 3.
+   */
+  getProgressToNextTier(
+    state: GameState,
+    monsterId: string
+  ): KnowledgeProgress | null;
+
+  /**
+   * Get all monsters with partial knowledge (discovered but not tier 3).
+   */
+  getInProgressMonsters(state: GameState): string[];
+
+  /**
+   * Get all monsters at max tier (tier 3).
+   */
+  getMasteredMonsters(state: GameState): string[];
+}
+
+/**
+ * Create knowledge service instance
+ */
+function createKnowledgeService(config: ProgressionConfig): KnowledgeService;
+```
+
+### Knowledge Types
+
+```typescript
+// ==================== Knowledge Types ====================
+
+/**
+ * Information revealed about a monster based on knowledge tier.
+ */
+interface MonsterRevealedInfo {
+  /** Current knowledge tier (0-3) */
+  readonly tier: 0 | 1 | 2 | 3;
+
+  /** How knowledge was primarily gained */
+  readonly learnedThrough: 'unknown' | 'encounters' | 'death';
+
+  // === Tier 0: Unknown ===
+  // All fields below are null at tier 0
+
+  // === Tier 1+: Basic Info ===
+
+  /** Monster name (null at tier 0, "???" shown instead) */
+  readonly name: string | null;
+
+  /** HP range approximation (null below tier 1) */
+  readonly hpRange: NumericRange | null;
+
+  /** Damage range approximation (null below tier 1) */
+  readonly damageRange: NumericRange | null;
+
+  // === Tier 2+: Combat Info ===
+
+  /** Attack pattern descriptions (null below tier 2) */
+  readonly attackPatterns: readonly string[] | null;
+
+  /** Resistance types (null below tier 2) */
+  readonly resistances: readonly string[] | null;
+
+  /** Weakness types (null below tier 2) */
+  readonly weaknesses: readonly string[] | null;
+
+  // === Tier 3: Full Mastery ===
+
+  /** Exact stat values (null below tier 3) */
+  readonly exactStats: MonsterExactStats | null;
+
+  /** Optimal combat strategy (null below tier 3) */
+  readonly strategy: string | null;
+
+  /** Full lore entry (null below tier 3) */
+  readonly lore: string | null;
+}
+
+interface MonsterExactStats {
+  readonly hp: number;
+  readonly damage: NumericRange;
+  readonly armor: number;
+  readonly speed: EnemySpeed;
+  readonly xpReward: number;
+  readonly goldReward: NumericRange;
+}
+
+/**
+ * Tier unlock thresholds from config.
+ */
+interface KnowledgeTierThresholds {
+  readonly tier1: { encounters: number; deaths: number };
+  readonly tier2: { encounters: number; deaths: number };
+  readonly tier3: { encounters: number; deaths: number };
+}
+
+/**
+ * Progress toward next knowledge tier.
+ */
+interface KnowledgeProgress {
+  /** Current tier */
+  readonly currentTier: 0 | 1 | 2;
+
+  /** Next tier to unlock */
+  readonly nextTier: 1 | 2 | 3;
+
+  /** Current encounter count */
+  readonly encounters: number;
+
+  /** Encounters needed for next tier */
+  readonly encountersNeeded: number;
+
+  /** Current death count */
+  readonly deaths: number;
+
+  /** Deaths needed for next tier */
+  readonly deathsNeeded: number;
+
+  /** Progress percentage (0-100) based on whichever path is closer */
+  readonly progressPercent: number;
+
+  /** Which unlock path is closer */
+  readonly fasterPath: 'encounters' | 'death';
+}
+
+/**
+ * Tier unlock conditions (from design spec).
+ * Unlocks when EITHER condition is met.
+ */
+const KNOWLEDGE_TIER_THRESHOLDS: KnowledgeTierThresholds = {
+  tier1: { encounters: 6, deaths: 1 },
+  tier2: { encounters: 15, deaths: 2 },
+  tier3: { encounters: 25, deaths: 3 },
+} as const;
 ```
 
 ### Derived Stats
@@ -497,6 +711,21 @@ const CHARACTER_CONSTANTS = {
     11: [1, 2],       // Floors 1-2 penalized
     16: [1, 2, 3],    // Floors 1-3 penalized
   } as Record<number, FloorNumber[]>,
+
+  // Veteran Knowledge Tier Thresholds
+  // Unlocks when EITHER encounters OR deaths condition is met
+  KNOWLEDGE_TIER_1: {
+    encounters: 6,    // 6 encounters with monster type
+    deaths: 1,        // OR 1 death to monster type
+  },
+  KNOWLEDGE_TIER_2: {
+    encounters: 15,   // 15 encounters
+    deaths: 2,        // OR 2 deaths
+  },
+  KNOWLEDGE_TIER_3: {
+    encounters: 25,   // 25 encounters
+    deaths: 3,        // OR 3 deaths
+  },
 } as const;
 ```
 
@@ -696,9 +925,9 @@ const CHARACTER_CONSTANTS = {
 
 ## Events Emitted
 
-The character system emits events through handlers that call it. The service itself is stateless.
+### CharacterService Events
 
-Events typically emitted by callers after character operations:
+The CharacterService itself is stateless. Events are emitted by callers after character operations:
 
 | Event | When Emitted |
 |-------|--------------|
@@ -706,11 +935,92 @@ Events typically emitted by callers after character operations:
 | `STAT_INCREASED` | After stat allocation during level up |
 | `XP_GAINED` | After XP is added to character |
 
+### KnowledgeService Events
+
+The KnowledgeService emits events for knowledge progression:
+
+| Event | When Emitted |
+|-------|--------------|
+| `VETERAN_KNOWLEDGE_UNLOCKED` | When monster knowledge reaches a new tier |
+
+**Event payload:**
+```typescript
+interface VeteranKnowledgeUnlockedEvent {
+  type: 'VETERAN_KNOWLEDGE_UNLOCKED';
+  timestamp: Timestamp;
+  monsterId: string;
+  monsterName: string;
+  tier: 1 | 2 | 3;
+  reveals: string[];           // List of newly revealed information
+  triggeredBy: 'encounters' | 'death';
+}
+```
+
+**Example emission:**
+```typescript
+// When Ghoul knowledge reaches Tier 2 via 15th encounter
+eventBus.emit({
+  type: 'VETERAN_KNOWLEDGE_UNLOCKED',
+  timestamp: now(),
+  monsterId: 'ghoul',
+  monsterName: 'Ghoul',
+  tier: 2,
+  reveals: ['Attack patterns', 'Resistances', 'Weaknesses'],
+  triggeredBy: 'encounters',
+});
+```
+
 ---
 
 ## Events Subscribed
 
-None. The character service is a pure computation module with no event subscriptions.
+The **CharacterService** is a pure computation module with no event subscriptions.
+
+The **KnowledgeService** subscribes to combat events for knowledge progression:
+
+| Event | Handler | Action |
+|-------|---------|--------|
+| `COMBAT_STARTED` | `onCombatStarted` | Dispatch `MONSTER_ENCOUNTERED` to increment encounter counter |
+| `ENEMY_KILLED` | `onEnemyKilled` | Evaluate tier unlock conditions, dispatch `KNOWLEDGE_TIER_UNLOCKED` if met |
+| `PLAYER_KILLED` | `onPlayerKilled` | Dispatch `DEATH_TO_MONSTER` to increment death counter, evaluate tier unlock |
+
+### Knowledge Event Flow
+
+```
+COMBAT_STARTED event received
+    │
+    ├─> KnowledgeService.onCombatStarted(enemyId)
+    │       │
+    │       └─> stateStore.dispatch({ type: 'MONSTER_ENCOUNTERED', payload: { monsterId } })
+    │               │
+    │               └─> Reducer increments encounters in VeteranKnowledgeState
+    │
+    └─> (combat proceeds...)
+
+ENEMY_KILLED event received
+    │
+    └─> KnowledgeService.onEnemyKilled(enemyId)
+            │
+            └─> Check if encounter count meets tier threshold
+                    │
+                    └─> If tier unlocked:
+                            ├─> stateStore.dispatch({ type: 'KNOWLEDGE_TIER_UNLOCKED', payload: { monsterId, tier } })
+                            └─> eventBus.emit(VeteranKnowledgeUnlockedEvent)
+
+PLAYER_KILLED event received
+    │
+    └─> KnowledgeService.onPlayerKilled(killerEnemyId)
+            │
+            ├─> stateStore.dispatch({ type: 'DEATH_TO_MONSTER', payload: { monsterId } })
+            │       │
+            │       └─> Reducer increments deaths in VeteranKnowledgeState
+            │
+            └─> Check if death count meets tier threshold
+                    │
+                    └─> If tier unlocked:
+                            ├─> stateStore.dispatch({ type: 'KNOWLEDGE_TIER_UNLOCKED', payload: { monsterId, tier } })
+                            └─> eventBus.emit(VeteranKnowledgeUnlockedEvent)
+```
 
 ---
 
@@ -768,6 +1078,36 @@ The character service does not manage state directly. It operates on CharacterSt
 | Level 6 on Floor 1 | 50% penalty applied |
 | Level 6 on Floor 2 | No penalty (only Floor 1 penalized) |
 | Level 11 on Floor 3 | No penalty (Floors 1-2 penalized, not 3) |
+
+### Knowledge System Edge Cases
+
+| Case | Handling |
+|------|----------|
+| First encounter with monster | Create MonsterKnowledge entry with encounters=1, deaths=0, tier=0 |
+| Encounter already at tier 3 | Increment counter but no tier change (already maxed) |
+| Death already at tier 3 | Increment counter but no tier change |
+| Multiple tier unlocks from single death | Process sequentially: tier 1, then 2, then 3 if all conditions met |
+| Unknown monster ID | Log warning, create new entry anyway |
+| Monster not in content registry | Log error, use placeholder name in events |
+| Service not initialized | Log error, no-op on event handlers |
+| Duplicate COMBAT_STARTED for same fight | Should not happen; if it does, increment counter again (idempotency not guaranteed) |
+| Death to The Watcher | Track as monster type "the_watcher" |
+| Death to DoT after enemy died | Use last enemy engaged for death tracking |
+| Simultaneous encounters/deaths meeting threshold | Either path unlocks tier; track which triggered for `triggeredBy` field |
+| getRevealedInfo for unknown monster | Return tier 0 info (all nulls) |
+
+### Knowledge Tier Calculation
+
+| Condition | Result |
+|-----------|--------|
+| 0 encounters, 0 deaths | Tier 0 |
+| 5 encounters, 0 deaths | Tier 0 (need 6) |
+| 6 encounters, 0 deaths | Tier 1 |
+| 1 encounter, 1 death | Tier 1 (death path faster) |
+| 14 encounters, 1 death | Tier 1 (need 15 encounters or 2 deaths) |
+| 15 encounters, 1 death | Tier 2 (encounter path met) |
+| 10 encounters, 2 deaths | Tier 2 (death path met) |
+| 25+ encounters OR 3+ deaths | Tier 3 (max) |
 
 ---
 
@@ -833,6 +1173,37 @@ The character service does not manage state directly. It operates on CharacterSt
    - Error returned for unknown class
    - Error returned for locked class
 
+9. **Knowledge Tier Calculation Tests**
+   - 0 encounters, 0 deaths = tier 0
+   - 5 encounters, 0 deaths = tier 0 (need 6)
+   - 6 encounters, 0 deaths = tier 1
+   - 1 encounter, 1 death = tier 1 (death path)
+   - 14 encounters, 1 death = tier 1
+   - 15 encounters, 1 death = tier 2 (encounter path)
+   - 10 encounters, 2 deaths = tier 2 (death path)
+   - 25 encounters, 2 deaths = tier 3 (encounter path)
+   - 20 encounters, 3 deaths = tier 3 (death path)
+   - 30 encounters, 5 deaths = tier 3 (capped, no tier 4)
+
+10. **Knowledge Event Handler Tests**
+    - COMBAT_STARTED increments encounter counter
+    - ENEMY_KILLED checks tier unlock after encounter
+    - PLAYER_KILLED increments death counter
+    - PLAYER_KILLED checks tier unlock after death
+    - Tier unlock dispatches KNOWLEDGE_TIER_UNLOCKED action
+    - Tier unlock emits VeteranKnowledgeUnlockedEvent
+    - Event contains correct `triggeredBy` field ('encounters' or 'death')
+
+11. **Knowledge Query Tests**
+    - getMonsterKnowledge returns tier 0 for unknown monster
+    - getMonsterKnowledge returns correct tier for known monster
+    - getRevealedInfo returns nulls at tier 0
+    - getRevealedInfo returns name, HP, damage at tier 1
+    - getRevealedInfo returns patterns, resistances, weaknesses at tier 2
+    - getRevealedInfo returns full stats, strategy, lore at tier 3
+    - getProgressToNextTier returns correct progress percentage
+    - getProgressToNextTier returns null at tier 3
+
 ### Property Tests
 
 ```typescript
@@ -863,6 +1234,30 @@ property("XP required increases with level", (level1, level2) => {
   if (level1 >= level2) return true;
   return getXPForNextLevel(level1) <= getXPForNextLevel(level2);
 });
+
+property("knowledge tier never decreases", (encounters, deaths, moreEncounters, moreDeaths) => {
+  const tier1 = calculateKnowledgeTier(encounters, deaths);
+  const tier2 = calculateKnowledgeTier(encounters + moreEncounters, deaths + moreDeaths);
+  return tier2 >= tier1;
+});
+
+property("knowledge tier is always 0-3", (encounters, deaths) => {
+  const tier = calculateKnowledgeTier(encounters, deaths);
+  return tier >= 0 && tier <= 3;
+});
+
+property("tier unlock is deterministic", (encounters, deaths) => {
+  const tier1 = calculateKnowledgeTier(encounters, deaths);
+  const tier2 = calculateKnowledgeTier(encounters, deaths);
+  return tier1 === tier2;
+});
+
+property("death path always unlocks tier faster or equal to encounter path", (tier) => {
+  if (tier < 1 || tier > 3) return true;
+  const thresholds = KNOWLEDGE_TIER_THRESHOLDS[`tier${tier}`];
+  // For any tier, deaths required ≤ encounters required (by design)
+  return thresholds.deaths <= thresholds.encounters;
+});
 ```
 
 ### Integration Tests
@@ -872,6 +1267,11 @@ property("XP required increases with level", (level1, level2) => {
 3. Level up multiple times, verify cumulative stat growth
 4. Test all three classes with their starting equipment
 5. Verify equipment changes immediately affect derived stats
+6. **Knowledge flow**: Combat start → encounter incremented → enemy killed → tier checked → event emitted
+7. **Knowledge flow**: Player death → death incremented → tier checked → event emitted
+8. **Knowledge persistence**: Knowledge survives session end (stored in ProfileState)
+9. **Multi-tier unlock**: Death to monster with 0 prior knowledge unlocks tier 1 immediately
+10. **Chronicler query**: getRevealedInfo returns correct data for each tier level
 
 ---
 
@@ -914,6 +1314,7 @@ Consider memoizing `computeDerivedStats` if it's called frequently:
 // src/core/character/index.ts
 
 export type {
+  // Character Service
   CharacterService,
   CharacterDerivedStats,
   StatBreakdown,
@@ -928,11 +1329,20 @@ export type {
   LevelUpErrorCode,
   CharacterCreationError,
   CharacterCreationErrorCode,
+
+  // Knowledge Service
+  KnowledgeService,
+  MonsterRevealedInfo,
+  MonsterExactStats,
+  KnowledgeTierThresholds,
+  KnowledgeProgress,
 };
 
 export {
   createCharacterService,
+  createKnowledgeService,
   CHARACTER_CONSTANTS,
+  KNOWLEDGE_TIER_THRESHOLDS,
 };
 
 // Re-export commonly used types from dependencies
@@ -942,5 +1352,7 @@ export type {
   StatBlock,
   StatName,
   CharacterClass,
+  VeteranKnowledgeState,
+  MonsterKnowledge,
 } from '../state';
 ```
