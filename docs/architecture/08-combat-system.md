@@ -22,8 +22,9 @@ Turn-based combat resolution engine. Processes combat actions, calculates damage
 
 ## Dependencies
 
-- **01-foundation**: Types (EntityId, EnemySpeed, EnemyType, CombatPhase), Result, SeededRNG, NumericRange
+- **01-foundation**: Types (EntityId, EnemySpeed, EnemyType), Result, SeededRNG, NumericRange
 - **02-content-registry**: MonsterTemplate, MonsterAbility, StatusEffectTemplate, CombatConfig
+- **03-state-management**: CombatState, TurnPhase, TurnOrder, PlayerCombatState, EnemyCombatState, CombatActionType, CombatAction
 - **04-event-system**: EventBus, combat events (CombatStartedEvent, PlayerAttackedEvent, etc.)
 - **06-character-system**: Character stats, equipped weapon damage, computed values
 - **07-item-system**: Item effects, consumable usage in combat
@@ -106,96 +107,27 @@ function createCombatEngine(
 
 ```typescript
 // ==================== Combat State ====================
+//
+// Canonical types imported from 03-state-management:
+//   - CombatState, TurnPhase, TurnOrder
+//   - PlayerCombatState, EnemyCombatState
+//   - CombatActionType, CombatAction
+//   - ActiveStatusEffect
+//
+// Combat system extends PlayerCombatState with computed fields:
 
-/**
- * Complete state of an active combat encounter.
- * Immutable - all updates create new state objects.
- */
-interface CombatState {
-  /** Current turn number (1-indexed) */
-  readonly turn: number;
-
-  /** Current phase within turn */
-  readonly phase: TurnPhase;
-
-  /** Player combat state */
-  readonly player: PlayerCombatState;
-
-  /** Enemy combat state */
-  readonly enemy: EnemyCombatState;
-
-  /** Combat log entries */
-  readonly log: readonly CombatLogEntry[];
-
-  /** Last player action (for enemy AI conditions) */
-  readonly lastPlayerAction: CombatActionType | null;
-
-  /** Whether player has acted this turn */
-  readonly playerActedThisTurn: boolean;
-
-  /** Whether enemy has acted this turn */
-  readonly enemyActedThisTurn: boolean;
-
-  /** Is this an ambush combat? */
-  readonly isAmbush: boolean;
-
-  /** Turn order for current combat */
-  readonly turnOrder: TurnOrder;
-}
-
-type TurnPhase =
-  | 'start_of_turn'      // Status ticks, stamina regen
-  | 'player_action'      // Awaiting player input
-  | 'player_resolving'   // Player action resolving
-  | 'enemy_action'       // Enemy executing action
-  | 'enemy_resolving'    // Enemy action resolving
-  | 'end_of_turn'        // Check combat end, increment turn
-  | 'combat_ended';      // Terminal state
-
-type TurnOrder =
-  | 'player_first'       // Standard: player acts before enemy
-  | 'enemy_first_strike' // FAST enemies: enemy acts first on Turn 1 only
-  | 'ambush';            // AMBUSH: enemy gets 2 free actions before Turn 1
-
-// ==================== Player Combat State ====================
-
-interface PlayerCombatState {
-  /** Current HP */
-  readonly currentHP: number;
-
-  /** Maximum HP */
-  readonly maxHP: number;
-
-  /** Current stamina */
-  readonly stamina: number;
-
-  /** Maximum stamina */
-  readonly maxStamina: number;
-
-  /** Active status effects */
-  readonly statusEffects: readonly ActiveStatusEffect[];
-
-  /** Is player blocking this turn? */
-  readonly isBlocking: boolean;
-
-  /** Did player dodge this turn? (avoids one attack) */
-  readonly isDodging: boolean;
-
-  /** Bonus stamina to add next turn (from dodge) */
-  readonly bonusStaminaNextTurn: number;
-
-  /** Is player stunned? */
-  readonly isStunned: boolean;
-
+interface CombatPlayerStateExtended extends PlayerCombatState {
   /** Computed damage range from weapon + stats */
   readonly damageRange: NumericRange;
 
-  /** Computed crit chance */
+  /** Computed crit chance from CUNNING + gear */
   readonly critChance: number;
 
-  /** Player armor percentage */
+  /** Player armor percentage from gear */
   readonly armor: number;
 }
+
+// ==================== Combat Initialization Input ====================
 
 interface CombatPlayerState {
   /** Current HP at combat start */
@@ -223,97 +155,14 @@ interface CombatPlayerState {
   statusEffects: readonly ActiveStatusEffect[];
 }
 
-// ==================== Enemy Combat State ====================
-
-interface EnemyCombatState {
-  /** Runtime instance ID */
-  readonly instanceId: EntityId;
-
-  /** Template ID for content lookup */
-  readonly templateId: string;
-
-  /** Display name */
-  readonly name: string;
-
-  /** Current HP */
-  readonly currentHP: number;
-
-  /** Maximum HP */
-  readonly maxHP: number;
-
-  /** Damage range */
-  readonly damageRange: NumericRange;
-
-  /** Base armor percentage */
-  readonly armor: number;
-
-  /** Speed category */
-  readonly speed: EnemySpeed;
-
-  /** Enemy type */
-  readonly type: EnemyType;
-
-  /** Active status effects */
-  readonly statusEffects: readonly ActiveStatusEffect[];
-
-  /** Is enemy staggered? */
-  readonly isStaggered: boolean;
-
-  /** Stagger count (for boss stagger resistance) */
-  readonly staggerCount: number;
-
-  /** Turns since last stagger (for boss 3-turn window) */
-  readonly turnsSinceStagger: number;
-
-  /** Ability cooldowns (abilityId -> turns remaining) */
-  readonly abilityCooldowns: Readonly<Record<string, number>>;
-
-  /** Track ability usage for conditions */
-  readonly abilityUsageHistory: readonly string[];
-
-  /** Remaining ambush actions (for AMBUSH speed) */
-  readonly ambushActionsRemaining: number;
-}
-
-// ==================== Status Effects ====================
-
-interface ActiveStatusEffect {
-  /** Unique instance ID */
-  readonly id: string;
-
-  /** Template ID for lookup */
-  readonly templateId: string;
-
-  /** Number of stacks (for stackable effects) */
-  readonly stacks: number;
-
-  /** Remaining duration in turns */
-  readonly remainingDuration: number;
-
-  /** Who applied this effect */
-  readonly source: 'player' | 'enemy' | 'environment';
-}
+// EnemyCombatState and ActiveStatusEffect imported from 03-state-management
 ```
 
 ### Combat Actions
 
 ```typescript
 // ==================== Combat Actions ====================
-
-type CombatActionType =
-  | 'light_attack'
-  | 'heavy_attack'
-  | 'dodge'
-  | 'block'
-  | 'pass'
-  | 'use_item'
-  | 'flee';
-
-interface CombatAction {
-  type: CombatActionType;
-  /** Item ID for use_item action */
-  itemId?: EntityId;
-}
+// CombatActionType and CombatAction imported from 03-state-management
 
 interface AvailableCombatAction {
   /** Action type */

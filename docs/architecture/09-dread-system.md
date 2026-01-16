@@ -12,7 +12,7 @@ This is **not** a damage system - it's an **information corruption** system. The
 
 1. Track and modify Dread value (0-100)
 2. Calculate Dread changes from all sources (combat, exploration, events, items)
-3. Apply Dread modifiers (torch, equipment effects)
+3. Apply Dread modifiers (torch effect only for MVP)
 4. Determine current Dread threshold
 5. Generate perception corruption based on threshold
 6. Emit threshold crossing events
@@ -27,7 +27,6 @@ This is **not** a damage system - it's an **information corruption** system. The
 - **01-foundation**: Types (`DreadThreshold`, `EnemyType`, `FloorNumber`), `SeededRNG`, `Result`, `clamp`
 - **02-content-registry**: `DreadConfig`, `DreadThresholdConfig`, config accessors
 - **04-event-system**: Event emission (`DREAD_CHANGED`, `DREAD_THRESHOLD_CROSSED`, `WATCHER_*`)
-- **06-character-system**: Current player equipment (for Dread reduction modifiers)
 
 ---
 
@@ -53,7 +52,7 @@ interface DreadManager {
 
   /**
    * Apply Dread change from a source
-   * Handles modifiers (torch, equipment) automatically
+   * Handles torch modifier automatically
    * Returns the actual change after modifiers
    */
   applyDreadChange(change: DreadChangeRequest): DreadChangeResult;
@@ -255,8 +254,7 @@ interface DreadChangeResult {
 }
 
 interface DreadModifier {
-  source: 'torch' | 'equipment' | 'blessing' | 'class_passive';
-  itemId?: string;
+  source: 'torch' | 'blessing' | 'class_passive';
   reduction: number;
 }
 
@@ -422,7 +420,6 @@ const DREAD_THRESHOLDS: readonly DreadThresholdRange[] = [
 function createDreadManager(
   config: DreadConfig,
   eventBus: EventBus,
-  characterService: CharacterService,
   initialDread?: number
 ): DreadManager;
 ```
@@ -731,9 +728,6 @@ interface DreadInternalState {
 
   /** Watcher spawn deferred (during boss fight) */
   watcherSpawnDeferred: boolean;
-
-  /** Cached equipment Dread modifiers */
-  equipmentDreadReduction: number;
 }
 ```
 
@@ -794,8 +788,7 @@ interface DreadInternalState {
    - Apply positive change increases Dread
    - Apply negative change decreases Dread
    - Dread clamps at 0 and 100
-   - Modifiers reduce Dread gain
-   - Torch modifier stacks with equipment
+   - Torch modifier reduces Dread gain
 
 2. **Threshold Tests**
    - Correct threshold for boundary values (49 = calm, 50 = uneasy)
@@ -846,7 +839,7 @@ interface DreadInternalState {
 
 ```typescript
 property("Dread always in [0, 100]", (changes: DreadChangeRequest[]) => {
-  const manager = createDreadManager(config, mockEventBus, mockCharService);
+  const manager = createDreadManager(config, mockEventBus);
   for (const change of changes) {
     manager.applyDreadChange(change);
   }
@@ -863,13 +856,13 @@ property("Threshold matches Dread value", (dread: number) => {
 
 property("Corruption never affects input", (action: PlayerAction) => {
   // High dread shouldn't change what action is executed
-  const manager = createDreadManager(config, mockEventBus, mockCharService, 100);
+  const manager = createDreadManager(config, mockEventBus, 100);
   const result = processAction(action);
   return result.actionType === action.type;
 });
 
 property("Watcher stun count never exceeds 3", (stunAttempts: number[]) => {
-  const manager = createDreadManager(config, mockEventBus, mockCharService, 100);
+  const manager = createDreadManager(config, mockEventBus, 100);
   for (const damage of stunAttempts) {
     manager.processWatcherStun(damage);
   }
@@ -953,7 +946,6 @@ Whispers are semi-random text injections in combat logs at high Dread. The syste
 ### Performance Considerations
 
 - Cache corruption rolls per display frame
-- Pre-compute equipment Dread modifiers on equipment change
 - Threshold lookup is O(1) via direct calculation
 - Whisper pool selection is O(1) weighted random
 
@@ -1051,3 +1043,26 @@ HP: ??? [Veteran: 24, but can you trust yourself?]
 ```
 
 This rewards investment while preserving horror.
+
+---
+
+## Future Enhancements
+
+### Equipment-Based Dread Modifiers (Deferred)
+
+**Not in MVP.** Equipment that reduces Dread gain (e.g., "Amulet of Calm: -10% Dread gain") was considered but deferred to simplify the architecture.
+
+**Current Dread management tools (sufficient for MVP):**
+- Torch (explicit activation, reduces Dread gain while active)
+- Rest (-25 Dread)
+- Consumables (Calm Draught -15, Clarity Potion -20)
+- Shrine blessings (-15 Dread)
+- Strategic extraction (player choice)
+
+**If added later, would require:**
+1. Add `CharacterService` and `StateStore` dependencies to DreadManager
+2. Subscribe to `ITEM_EQUIPPED`/`ITEM_UNEQUIPPED` events
+3. Cache equipment Dread reduction in internal state
+4. Include equipment modifiers in `getDreadGainReduction()` calculation
+
+This is an advanced build customization option, not a core mechanic.

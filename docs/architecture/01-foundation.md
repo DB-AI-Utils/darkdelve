@@ -60,7 +60,10 @@ type RoomState = 'unexplored' | 'entered' | 'cleared';
 /** Player character classes */
 type CharacterClass = 'mercenary' | 'flagellant' | 'hollowed_one';
 
-/** Combat turn phase */
+/**
+ * @deprecated Use TurnPhase from 03-state-management instead.
+ * This coarse-grained model is insufficient for combat resolution.
+ */
 type CombatPhase = 'player_turn' | 'enemy_turn' | 'resolution';
 
 /** Enemy speed categories */

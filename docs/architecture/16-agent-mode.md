@@ -436,8 +436,8 @@ interface AgentCombatState {
   /** Current turn number */
   turn: number;
 
-  /** Combat phase */
-  phase: CombatPhase;
+  /** Current phase within turn (from TurnPhase in 03-state-management) */
+  phase: TurnPhase;
 
   /** Enemy information (may be corrupted by Dread) */
   enemy: AgentEnemyState;

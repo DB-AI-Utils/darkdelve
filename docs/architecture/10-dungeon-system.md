@@ -373,39 +373,11 @@ type NavigationErrorCode =
 // ==================== Room Instance Types ====================
 
 /**
- * Runtime room instance with generated content.
- * Extends base types from 03-state-management.
+ * RoomInstanceState and RoomConnection are defined in 03-state-management.
+ * This module uses those canonical definitions.
+ *
+ * See: 03-state-management.md for RoomInstanceState, RoomConnection, RoomContents
  */
-interface RoomInstanceState {
-  /** Unique room ID */
-  readonly id: string;
-
-  /** Room type */
-  readonly type: RoomType;
-
-  /** Current exploration state */
-  readonly state: RoomState;
-
-  /** Connected rooms */
-  readonly connections: readonly RoomConnection[];
-
-  /** Room-specific contents */
-  readonly contents: RoomContents;
-
-  /** Floor this room is on */
-  readonly floor: FloorNumber;
-
-  /** Position in floor layout (for consistent ordering) */
-  readonly layoutIndex: number;
-}
-
-interface RoomConnection {
-  /** Target room ID */
-  readonly targetRoomId: string;
-
-  /** Direction to reach target */
-  readonly direction: Direction;
-}
 
 // ==================== Room Contents Types ====================
 

@@ -368,8 +368,7 @@ interface DeathEconomyService {
 
   /**
    * Get item's death risk status.
-   * Note: broughtFromStash parameter is redundant if item.source === 'brought',
-   * but kept for explicitness when caller has already resolved this.
+   * broughtFromStash is determined by checking broughtItemIds.
    */
   getItemDeathRisk(
     item: ItemInstance,

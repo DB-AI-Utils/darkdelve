@@ -883,6 +883,32 @@ function execute(command: GameCommand): CommandResult {
 }
 ```
 
+### CREATE_PROFILE Orchestration Pattern
+
+The CREATE_PROFILE command follows an orchestration pattern where responsibility
+is distributed across architectural boundaries.
+
+**Execution Flow:**
+
+1. Command processor validates name uniqueness and class validity
+2. State utilities construct the ProfileState (owns construction logic)
+3. Save system persists the ProfileState (owns I/O, no game mechanics)
+4. State store receives PROFILE_LOADED action
+5. Event bus emits PROFILE_CREATED
+
+**Boundary Ownership:**
+
+| Step | Owner | Responsibility |
+|------|-------|----------------|
+| Validation | Command Processor | Name format, class existence |
+| Construction | State Utilities (03) | Profile + character state assembly |
+| Persistence | Save System (13) | File I/O, atomic writes |
+| State Update | State Store (03) | In-memory state management |
+
+**Key Decision:** Save system receives pre-constructed ProfileState rather than
+constructing it internally. This keeps ContentRegistry dependency in the command
+layer where it belongs, and maintains save system as a pure persistence layer.
+
 ---
 
 ## Public Exports

@@ -24,6 +24,7 @@ Manages all item-related operations: runtime item instances, inventory managemen
 
 - **01-foundation**: Types (EntityId, Rarity, EquipmentSlot, ItemSlot), Result, SeededRNG
 - **02-content-registry**: ItemTemplate, ConsumableData, ItemEffect, EffectType, LootTable
+- **03-state-management**: ItemInstance, ItemSource, InventoryState, EquipmentState, ConsumableSlotState, StashState
 - **06-character**: Equipment validation, class-specific rules (Hollowed One curse immunity)
 
 ---
@@ -36,34 +37,14 @@ Manages all item-related operations: runtime item instances, inventory managemen
 // ==================== Runtime Item ====================
 
 /**
- * Runtime instance of an item.
- * Created from ItemTemplate with unique ID and mutable state.
+ * IMPORTED FROM: 03-state-management
+ *
+ * ItemInstance and ItemSource are canonical types defined in State Management.
+ * See docs/architecture/03-state-management.md for full definitions.
+ *
+ * - ItemInstance: Runtime instance with id, templateId, identified, source, acquiredAt
+ * - ItemSource: 'starting' | 'found' | 'purchased'
  */
-interface ItemInstance {
-  /** Unique runtime identifier */
-  readonly id: EntityId;
-
-  /** Template ID for content lookup */
-  readonly templateId: string;
-
-  /** Current identification state */
-  readonly identified: boolean;
-
-  /** Source tracking for death economy */
-  readonly source: ItemSource;
-
-  /** When item was acquired (for sorting) */
-  readonly acquiredAt: Timestamp;
-}
-
-/**
- * Where the item came from (affects death recovery)
- */
-type ItemSource =
-  | 'starting'   // Class starter gear - never lost
-  | 'found'      // Dropped from enemy/chest - follows ID rules
-  | 'purchased'  // Bought from merchant - follows ID rules
-  | 'brought';   // Brought from stash - always lost on death
 
 /**
  * Full item data combining instance and template
@@ -82,16 +63,19 @@ interface ResolvedItem {
  *
  * Status determination priority (highest to lowest):
  * 1. source === 'starting' → 'safe' (starting gear always preserved)
- * 2. source === 'brought' → 'at_risk' (brought from stash, always lost)
+ * 2. SessionState.broughtItems.includes(id) → 'at_risk' (brought from stash, always lost)
  * 3. !isEquipped → 'doomed' (carried items always lost)
  * 4. !identified → 'vulnerable' (equipped but unidentified, lost)
  * 5. identified → 'protected' (equipped + identified, survives)
+ *
+ * Note: 'at_risk' is determined by checking SessionState.broughtItems,
+ * not by item.source (which only stores original acquisition method).
  */
 type ItemRiskStatus =
   | 'safe'        // Starting gear - cannot be lost
   | 'protected'   // Equipped + identified - survives death
   | 'vulnerable'  // Equipped but unidentified - lost on death
-  | 'at_risk'     // Brought from stash - always lost on death
+  | 'at_risk'     // Brought from stash this run - always lost on death
   | 'doomed';     // Carried (not equipped) - lost on death
 ```
 
@@ -572,8 +556,8 @@ interface StashService {
   findItem(stash: StashState, itemId: EntityId): ItemInstance | undefined;
 
   /**
-   * Prepare items to bring on expedition
-   * Marks items as 'brought' source
+   * Prepare items to bring on expedition.
+   * Returns item IDs to track as brought for death economy.
    */
   prepareBringItems(
     stash: StashState,
@@ -1255,10 +1239,11 @@ function unequipWeapon(
 ```typescript
 // src/core/items/index.ts
 
+// Re-export from state-management for convenience
+export type { ItemInstance, ItemSource } from '../state';
+
 export type {
-  // Item types
-  ItemInstance,
-  ItemSource,
+  // Item types (defined here)
   ResolvedItem,
   ItemRiskStatus,
 

@@ -437,6 +437,8 @@ interface StashItemView {
   sellValue: number;
   isQuest: boolean;
   isJunk: boolean;
+  source: ItemSource;
+  acquiredAt: Timestamp;
 }
 
 type StashSortCriteria =
@@ -1100,8 +1102,23 @@ type ChroniclerSection = 'bestiary' | 'lessons' | 'lore' | 'log';
 ### Property-Based Tests
 
 ```typescript
+// Test fixture factory - provides sensible defaults for property tests.
+// Uses createInitialState from state-management with test-appropriate values.
+function createTestState(overrides?: {
+  profileName?: string;
+  classId?: CharacterClass;
+}): GameState {
+  const testRegistry = createTestContentRegistry(); // Test helper from test utilities
+  return createInitialState(
+    overrides?.profileName ?? 'TestProfile',
+    'human',
+    overrides?.classId ?? 'warrior',
+    testRegistry
+  );
+}
+
 property("stash never exceeds capacity", (operations) => {
-  let state = createInitialState();
+  let state = createTestState();
   for (const op of operations) {
     const result = campService.executeOperation(state, op);
     if (result.success) {
@@ -1112,14 +1129,14 @@ property("stash never exceeds capacity", (operations) => {
 });
 
 property("bring items always <= 2", (selections) => {
-  let state = createInitialState();
+  let state = createTestState();
   const result = expeditionService.selectBringItems(state, selections);
   if (!result.success) return true;
   return result.value.selectedItems.length <= 2;
 });
 
 property("gold never negative after purchase", (purchases) => {
-  let state = createInitialState();
+  let state = createTestState();
   for (const templateId of purchases) {
     const result = merchantService.purchaseItem(state, templateId);
     if (result.success) {
@@ -1130,7 +1147,7 @@ property("gold never negative after purchase", (purchases) => {
 });
 
 property("consumable slots never exceed 3", (selections) => {
-  let state = createInitialState();
+  let state = createTestState();
   const result = expeditionService.selectConsumables(state, selections);
   if (!result.success) return true;
   return result.value.consumables.length <= 3;
@@ -1309,7 +1326,7 @@ function processLessonLearnedAtStart(state: GameState): GameState {
 ### Stash Sorting
 
 ```typescript
-const SORT_COMPARATORS: Record<StashSortCriteria, (a: StashedItem, b: StashedItem) => number> = {
+const SORT_COMPARATORS: Record<StashSortCriteria, (a: StashItemView, b: StashItemView) => number> = {
   rarity: (a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity],
   slot: (a, b) => SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot],
   name: (a, b) => a.name.localeCompare(b.name),

@@ -19,6 +19,7 @@ Immutable game state representation with atomic updates via reducers. All state 
 ## Dependencies
 
 - **01-foundation**: Types, EntityId, Result
+- **02-content-registry**: ContentRegistry (for class definitions in state factory functions)
 
 ---
 
@@ -83,12 +84,21 @@ type GamePhase =
 
 /**
  * Persistent player profile - survives between sessions.
+ *
+ * **Identifier Model**: Profile uses a single identifier for both display
+ * and filesystem storage. The `name` field IS the identifier - no separate
+ * ID mapping exists. This value must be filesystem-safe (alphanumeric,
+ * dash, underscore only) and is used as the directory name in profiles/.
+ *
+ * Validation rules are defined in 13-save-system.md profileNameRules config.
  */
 interface ProfileState {
-  /** Unique profile identifier */
-  readonly id: string;
-
-  /** Profile display name */
+  /**
+   * Profile identifier and display name (same value).
+   * Must be filesystem-safe: alphanumeric, dash, underscore only.
+   * Used as directory name: profiles/{name}/
+   * Validated by ProfileManager.createProfile() against profileNameRules.
+   */
   readonly name: string;
 
   /** Creation timestamp */
@@ -153,43 +163,59 @@ interface CharacterState {
   readonly equipment: EquipmentState;
 }
 
-interface EquipmentState {
-  readonly weapon: EquippedItem;
-  readonly armor: EquippedItem | null;
-  readonly helm: EquippedItem | null;
-  readonly accessory: EquippedItem | null;
-}
+// ==================== Item Instance (Canonical Definition) ====================
 
-interface EquippedItem {
-  /** Runtime instance ID */
+/**
+ * Runtime instance of an item.
+ * Created from ItemTemplate with unique ID and instance-specific state.
+ *
+ * CANONICAL TYPE: This is the authoritative definition.
+ * Item System (07) imports this type rather than defining its own.
+ */
+interface ItemInstance {
+  /** Unique runtime identifier */
   readonly id: EntityId;
 
   /** Template ID for content lookup */
   readonly templateId: string;
 
-  /** Whether item has been identified */
+  /** Current identification state */
   readonly identified: boolean;
 
-  /** Source of this item (for death economy) */
+  /** Source tracking for death economy */
   readonly source: ItemSource;
+
+  /** When item was acquired (for sorting) */
+  readonly acquiredAt: Timestamp;
 }
 
-type ItemSource = 'starting' | 'found' | 'purchased' | 'brought';
+/**
+ * ItemSource tracks original acquisition method.
+ * Note: 'brought' status is tracked separately via broughtItems in SessionState,
+ * not stored on the item itself (items returning to stash after death should not
+ * permanently carry 'brought' status).
+ *
+ * CANONICAL TYPE: This is the authoritative definition.
+ * Item System (07) imports this type rather than defining its own.
+ */
+type ItemSource = 'starting' | 'found' | 'purchased';
+
+// ==================== Equipment State ====================
+
+interface EquipmentState {
+  readonly weapon: ItemInstance;
+  readonly armor: ItemInstance | null;
+  readonly helm: ItemInstance | null;
+  readonly accessory: ItemInstance | null;
+}
 
 // ==================== Stash State ====================
 
 interface StashState {
-  /** Items in stash */
-  readonly items: readonly StashedItem[];
+  readonly items: readonly ItemInstance[];
 
   /** Maximum capacity */
   readonly capacity: number;
-}
-
-interface StashedItem {
-  readonly id: EntityId;
-  readonly templateId: string;
-  readonly identified: boolean;
 }
 
 // ==================== Knowledge State ====================
@@ -399,6 +425,10 @@ interface RoomInstanceState {
   readonly state: RoomState;
   readonly connections: readonly RoomConnection[];
   readonly contents: RoomContents;
+  /** Floor this room is on (denormalized from parent FloorState for convenience) */
+  readonly floor: FloorNumber;
+  /** Position in floor layout for consistent map rendering order */
+  readonly layoutIndex: number;
 }
 
 interface RoomConnection {
@@ -497,14 +527,8 @@ interface RetreatCostState {
 // ==================== Inventory State ====================
 
 interface InventoryState {
-  readonly items: readonly InventoryItem[];
+  readonly items: readonly ItemInstance[];
   readonly capacity: number;
-}
-
-interface InventoryItem {
-  readonly id: EntityId;
-  readonly templateId: string;
-  readonly identified: boolean;
 }
 
 interface ConsumableSlotState {
@@ -541,12 +565,34 @@ interface BuffEffect {
 
 // ==================== Combat State ====================
 
+/**
+ * Turn phase within combat.
+ * Granular phases support proper turn resolution and CLI rendering.
+ */
+type TurnPhase =
+  | 'start_of_turn'      // Status ticks, stamina regen
+  | 'player_action'      // Awaiting player input
+  | 'player_resolving'   // Player action resolving
+  | 'enemy_action'       // Enemy executing action
+  | 'enemy_resolving'    // Enemy action resolving
+  | 'end_of_turn'        // Check combat end, increment turn
+  | 'combat_ended';      // Terminal state
+
+/**
+ * Turn order determines who acts first.
+ * Derived from enemy speed at combat initialization.
+ */
+type TurnOrder =
+  | 'player_first'       // Standard: player acts before enemy
+  | 'enemy_first_strike' // FAST enemies: enemy acts first on Turn 1 only
+  | 'ambush';            // AMBUSH: enemy gets 2 free actions before Turn 1
+
 interface CombatState {
-  /** Current turn number */
+  /** Current turn number (1-indexed) */
   readonly turn: number;
 
-  /** Current combat phase */
-  readonly phase: CombatPhase;
+  /** Current phase within turn */
+  readonly phase: TurnPhase;
 
   /** Player combat state */
   readonly player: PlayerCombatState;
@@ -554,17 +600,23 @@ interface CombatState {
   /** Enemy combat state */
   readonly enemy: EnemyCombatState;
 
-  /** Combat log for this fight */
+  /** Combat log entries */
   readonly log: readonly CombatLogEntry[];
 
-  /** Last player action (for enemy AI) */
-  readonly lastPlayerAction: CombatAction | null;
+  /** Last player action type (for enemy AI conditions) */
+  readonly lastPlayerAction: CombatActionType | null;
 
-  /** Whether player acted this turn */
+  /** Whether player has acted this turn */
   readonly playerActedThisTurn: boolean;
 
-  /** Whether enemy acted this turn */
+  /** Whether enemy has acted this turn */
   readonly enemyActedThisTurn: boolean;
+
+  /** Is this an ambush combat? */
+  readonly isAmbush: boolean;
+
+  /** Turn order for current combat */
+  readonly turnOrder: TurnOrder;
 }
 
 interface PlayerCombatState {
@@ -575,20 +627,36 @@ interface PlayerCombatState {
   readonly statusEffects: readonly ActiveStatusEffect[];
   readonly isBlocking: boolean;
   readonly isDodging: boolean;
+  /** Bonus stamina to add next turn (from dodge) */
+  readonly bonusStaminaNextTurn: number;
+  /** Is player stunned? */
+  readonly isStunned: boolean;
 }
 
 interface EnemyCombatState {
   readonly instanceId: EntityId;
   readonly templateId: string;
+  /** Display name */
+  readonly name: string;
   readonly currentHP: number;
   readonly maxHP: number;
+  /** Damage range from template */
+  readonly damageRange: NumericRange;
   readonly armor: number;
   readonly speed: EnemySpeed;
+  /** Enemy type category */
+  readonly type: EnemyType;
   readonly statusEffects: readonly ActiveStatusEffect[];
   readonly isStaggered: boolean;
   readonly staggerCount: number;
+  /** Turns since last stagger (for boss 3-turn window) */
+  readonly turnsSinceStagger: number;
   readonly abilityCooldowns: Readonly<Record<string, number>>;
   readonly turnsSinceLastAbility: Readonly<Record<string, number>>;
+  /** Track ability usage for AI conditions */
+  readonly abilityUsageHistory: readonly string[];
+  /** Remaining ambush actions (for AMBUSH speed enemies) */
+  readonly ambushActionsRemaining: number;
 }
 
 interface ActiveStatusEffect {
@@ -630,6 +698,16 @@ interface DamageBreakdown {
   readonly lessonLearnedBonus: number;
   readonly finalDamage: number;
 }
+
+/** Combat action type identifier */
+type CombatActionType =
+  | 'light_attack'
+  | 'heavy_attack'
+  | 'dodge'
+  | 'block'
+  | 'pass'
+  | 'use_item'
+  | 'flee';
 
 type CombatAction =
   | { type: 'light_attack' }
@@ -736,12 +814,12 @@ type StateAction =
   | { type: 'CHARACTER_STAT_CHANGED'; payload: { stat: StatName; delta: number } }
 
   // Equipment actions
-  | { type: 'ITEM_EQUIPPED'; payload: { item: EquippedItem; slot: EquipmentSlot } }
+  | { type: 'ITEM_EQUIPPED'; payload: { item: ItemInstance; slot: EquipmentSlot } }
   | { type: 'ITEM_UNEQUIPPED'; payload: { slot: EquipmentSlot } }
   | { type: 'ITEM_IDENTIFIED'; payload: { itemId: EntityId } }
 
   // Stash actions
-  | { type: 'STASH_ITEM_ADDED'; payload: { item: StashedItem } }
+  | { type: 'STASH_ITEM_ADDED'; payload: { item: ItemInstance } }
   | { type: 'STASH_ITEM_REMOVED'; payload: { itemId: EntityId } }
 
   // Gold actions
@@ -759,7 +837,7 @@ type StateAction =
   | { type: 'PLAYER_STATUS_TICK'; payload: { effectId: string } }
 
   // Inventory actions
-  | { type: 'INVENTORY_ITEM_ADDED'; payload: { item: InventoryItem } }
+  | { type: 'INVENTORY_ITEM_ADDED'; payload: { item: ItemInstance } }
   | { type: 'INVENTORY_ITEM_REMOVED'; payload: { itemId: EntityId } }
   | { type: 'CONSUMABLE_ADDED'; payload: { templateId: string; count: number } }
   | { type: 'CONSUMABLE_USED'; payload: { slotIndex: number } }
@@ -842,9 +920,39 @@ interface CombatActionResult {
 // ==================== State Utilities ====================
 
 /**
- * Create initial game state for a new profile
+ * Create complete ProfileState for a new profile with character initialized.
+ * This is the canonical factory for new profiles - used by command processor
+ * when handling CREATE_PROFILE commands.
+ *
+ * Note: This function does NOT validate profileName - validation happens in
+ * ProfileManager.createProfile() against profileNameRules. Callers should
+ * either pre-validate or rely on ProfileManager to reject invalid names.
+ *
+ * @param profileName - Profile identifier (must be filesystem-safe: alphanumeric,
+ *                      dash, underscore). Becomes ProfileState.name and directory name.
+ * @param playerType - Human or AI agent
+ * @param classId - Starting character class
+ * @param registry - Content registry for class definitions
+ * @param agentId - Required if playerType is 'ai_agent'
  */
-function createInitialState(profileName: string, playerType: 'human' | 'ai_agent'): GameState;
+function createProfileState(
+  profileName: string,
+  playerType: 'human' | 'ai_agent',
+  classId: CharacterClass,
+  registry: ContentRegistry,
+  agentId?: string
+): ProfileState;
+
+/**
+ * Create initial game state for a new profile.
+ * Requires classId to initialize character state.
+ */
+function createInitialState(
+  profileName: string,
+  playerType: 'human' | 'ai_agent',
+  classId: CharacterClass,
+  registry: ContentRegistry
+): GameState;
 
 /**
  * Create initial character state for a class
@@ -1036,10 +1144,9 @@ export type {
   ProfileState,
   CharacterState,
   EquipmentState,
-  EquippedItem,
+  ItemInstance,
   ItemSource,
   StashState,
-  StashedItem,
   VeteranKnowledgeState,
   MonsterKnowledge,
   BestiaryState,
@@ -1069,7 +1176,6 @@ export type {
   ExtractionCostState,
   RetreatCostState,
   InventoryState,
-  InventoryItem,
   ConsumableSlotState,
   ConsumableStack,
   ActiveBuff,

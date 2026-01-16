@@ -24,7 +24,8 @@ Provides character creation, stat calculation, leveling, derived value computati
 
 - **01-foundation**: Types (StatBlock, StatName, CharacterClass, NumericRange, Result), utility functions (clamp)
 - **02-content-registry**: ClassDefinition, ItemTemplate, MonsterTemplate, ProgressionConfig
-- **03-state-management**: CharacterState, EquipmentState, EquippedItem, VeteranKnowledgeState, MonsterKnowledge, GameState, StateStore
+- **03-state-management**: CharacterState, EquipmentState, VeteranKnowledgeState, MonsterKnowledge, GameState, StateStore
+- **07-item-system**: ItemInstance
 - **04-event-system**: EventBus, CombatStartedEvent, EnemyKilledEvent, PlayerKilledEvent (for KnowledgeService)
 
 ---

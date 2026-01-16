@@ -35,42 +35,56 @@ Handles all persistence operations for DARKDELVE: profile management, game state
 
 /**
  * Manages player profiles and their persistence.
+ *
+ * **Identifier Convention**: All `profileName` parameters refer to
+ * `ProfileState.name`, which is both the display name AND the filesystem
+ * directory name. Names must be filesystem-safe (alphanumeric, dash,
+ * underscore) and are validated against `profileNameRules` config.
+ *
+ * Directory structure: profiles/{profileName}/
  */
 interface ProfileManager {
   /**
-   * Get list of all profile names
+   * Get list of all profile names (directory names under profiles/)
    */
   listProfiles(): Promise<Result<string[], SaveError>>;
 
   /**
-   * Check if a profile exists
+   * Check if a profile directory exists
+   * @param profileName - ProfileState.name value
    */
   profileExists(profileName: string): Promise<boolean>;
 
   /**
-   * Create a new profile with default state
-   * @param profileName - Filesystem-safe name (alphanumeric, underscore, dash)
-   * @param playerType - Human or AI agent
-   * @param agentId - Required if playerType is 'ai_agent'
+   * Persist a new profile to storage.
+   * Profile state must be pre-constructed using createProfileState() from
+   * state-management utilities. This keeps profile/character construction
+   * logic in state layer and persistence logic in save layer.
+   *
+   * Validates profile.name against profileNameRules before creating directory.
+   * Returns INVALID_PROFILE_NAME error if validation fails.
+   *
+   * @param profile - Pre-constructed ProfileState from state utilities
    */
-  createProfile(
-    profileName: string,
-    playerType: 'human' | 'ai_agent',
-    agentId?: string
-  ): Promise<Result<ProfileState, SaveError>>;
+  createProfile(profile: ProfileState): Promise<Result<ProfileState, SaveError>>;
 
   /**
-   * Load an existing profile
+   * Load an existing profile from profiles/{profileName}/
+   * @param profileName - ProfileState.name value (directory name)
    */
   loadProfile(profileName: string): Promise<Result<ProfileState, SaveError>>;
 
   /**
-   * Delete a profile and all its data
+   * Delete a profile and all its data (removes entire directory)
+   * @param profileName - ProfileState.name value (directory name)
    */
   deleteProfile(profileName: string): Promise<Result<void, SaveError>>;
 
   /**
-   * Rename a profile
+   * Rename a profile. Renames both the directory and updates ProfileState.name.
+   * Validates newName against profileNameRules before renaming.
+   * @param oldName - Current ProfileState.name (directory name)
+   * @param newName - New name (must pass profileNameRules validation)
    */
   renameProfile(
     oldName: string,
@@ -394,6 +408,7 @@ interface EquippedItemSaveData {
   templateId: string;
   identified: boolean;
   source: ItemSource;
+  acquiredAt: Timestamp;
 }
 
 interface VeteranKnowledgeSaveData {
@@ -470,7 +485,11 @@ interface StashedItemSaveData {
   id: EntityId;
   templateId: string;
   identified: boolean;
+  source: ItemSource;
+  acquiredAt: Timestamp;
 }
+
+// Migration: Saves without source/acquiredAt default to source: 'found', acquiredAt: modifiedAt
 ```
 
 ### Atomic Write Operations
@@ -980,18 +999,15 @@ function setupSaveTriggers(
 
 ### Default Profile Creation
 
-On first launch, create the default profile:
+On first launch, ensure a default profile exists. The orchestration follows
+the standard pattern:
 
-```typescript
-async function ensureDefaultProfile(
-  profileManager: ProfileManager
-): Promise<void> {
-  const exists = await profileManager.profileExists('default');
-  if (!exists) {
-    await profileManager.createProfile('default', 'human');
-  }
-}
-```
+1. Check existence via `profileExists('default')`
+2. If missing, construct ProfileState via `createProfileState()` from state utilities (03)
+3. Persist via `createProfile(profile)`
+
+**Key boundary:** ProfileManager receives pre-constructed ProfileState. It does not
+know about character classes or ContentRegistry - that knowledge stays in state utilities.
 
 ---
 

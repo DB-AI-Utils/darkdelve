@@ -161,7 +161,7 @@ type ScreenType =
   | 'expedition_confirm'
 
   // Dungeon screens
-  | 'dungeon_exploration'
+  | 'dungeon_exploring'
   | 'dungeon_combat'
   | 'dungeon_treasure'
   | 'dungeon_event'
@@ -1372,7 +1372,7 @@ async function mainLoop(app: CLIApplication): Promise<void> {
   const eventQueue: GameEvent[] = [];
 
   // Subscribe to all events
-  gameSession.subscribe('*', (event) => {
+  gameSession.subscribeAll((event) => {
     eventQueue.push(event);
   });
 
