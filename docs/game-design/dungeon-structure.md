@@ -268,6 +268,8 @@ The Threshold Chamber offers a **Retreat** option—NOT extraction. This returns
 
 Room breakdown by floor (designed for 1-1.5 min/room average):
 
+> **MVP Scope**: MVP uses 0 rest rooms on Floor 5. The rest/special room is a post-MVP addition.
+
 | Floor | Combat | Treasure | Event | Rest/Special | Total |
 |-------|--------|----------|-------|--------------|-------|
 | 1 | 2 | 1 | 1 | 0 | 4 |
@@ -275,6 +277,8 @@ Room breakdown by floor (designed for 1-1.5 min/room average):
 | 3 | 2 | 1 | 1 | 0 | 4 |
 | 4 | 2 | 1 | 1 | 0 | 4 |
 | 5 | 4 | 1 | 1 | 1 (+ boss) | 7 |
+
+*MVP Floor 5: 4 combat, 1 treasure, 1 event, 0 rest = 6 rooms + boss*
 
 **Room Time Budget:**
 - Combat rooms: 1.5-2 minutes (4-8 turns)

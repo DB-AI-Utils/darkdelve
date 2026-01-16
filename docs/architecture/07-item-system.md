@@ -862,7 +862,7 @@ interface BuybackResult {
   ],
   "buybackMarkup": 1.25,
   "sellRatio": 0.5,
-  "unidentifiedSellRatio": 0.25,
+  "unidentifiedSellRatio": 0.5,
   "buybackLimit": 5,
   "stockSeedComponents": ["runNumber", "characterLevel", "lastExtractionFloor"]
 }

@@ -295,6 +295,7 @@ THE CHRONICLER
   [2] LESSONS LEARNED  - Death insights (+damage vs known foes)
   [3] LORE FRAGMENTS   - World knowledge (12 entries)
   [4] EXPEDITION LOG   - Recent run summaries
+  [5] IDENTIFY ITEM    - Reveal item properties (25g)
 
   [B] BACK TO CAMP
 ══════════════════════════════════════════════════════════════

@@ -153,6 +153,9 @@ interface ContentRegistry {
 
   /** Get analytics configuration */
   getAnalyticsConfig(): AnalyticsConfig;
+
+  /** Get loot generation configuration */
+  getLootConfig(): LootConfig;
 }
 ```
 
@@ -923,6 +926,42 @@ interface AnalyticsConfig {
   computeDailyAggregates: boolean;
   computeWeeklyAggregates: boolean;
 }
+
+interface LootConfig {
+  // Drop chances by source (0-1)
+  dropChances: {
+    basicEnemy: number;
+    eliteEnemy: number;
+    boss: number;
+    treasureChest: number;
+  };
+
+  // Item counts per drop
+  itemCounts: {
+    basicEnemy: { min: number; max: number };
+    eliteEnemy: { min: number; max: number; bonusChance: number };
+    boss: { min: number; max: number; bonusChance: number };
+    ornateChest: { min: number; max: number };
+  };
+
+  // Slot weights for random equipment drops
+  slotWeights: {
+    weapon: number;
+    armor: number;
+    helm: number;
+    accessory: number;
+  };
+
+  // Consumable drop chances
+  consumableChance: {
+    default: number;
+    chestFloor3Plus: number;
+  };
+
+  // Special rates
+  bossLegendaryRate: number;
+  dreadQualityBonusMultiplier: number;
+}
 ```
 
 ### Error Types
@@ -997,7 +1036,8 @@ darkdelve/
 │   ├── extraction.json     # ExtractionConfig
 │   ├── progression.json    # ProgressionConfig
 │   ├── merchant.json       # MerchantConfig
-│   └── analytics.json      # AnalyticsConfig
+│   ├── analytics.json      # AnalyticsConfig
+│   └── loot.json           # LootConfig
 │
 └── content/
     ├── items/
@@ -1044,10 +1084,10 @@ darkdelve/
 
 ### Example Content Files
 
-**configs/combat.json:**
+**configs/combat.json:** *(canonical values in `docs/game-design/combat.md`)*
 ```json
 {
-  "maxStamina": 5,
+  "maxStamina": 4,
   "staminaRegenBase": 2,
   "staminaRegenOnPass": 2,
 
@@ -1063,7 +1103,7 @@ darkdelve/
   "blockDamageReduction": 0.50,
 
   "baseCritChance": 0.05,
-  "critMultiplier": 1.5,
+  "critMultiplier": 2.5,
   "critChanceCap": 0.65,
   "cunningPerCritPoint": 0.03,
   "cunningDiminishingThreshold": 10,
@@ -1316,6 +1356,7 @@ export type {
   ProgressionConfig,
   MerchantConfig,
   AnalyticsConfig,
+  LootConfig,
 
   // Errors
   ContentLoadError,

@@ -651,6 +651,8 @@ interface DungeonSystem {
 
 ### configs/dungeon.json
 
+> **Note:** Extraction costs are NOT configured here. They are managed by the Extraction System (`configs/extraction.json`). See [11-extraction-system.md](11-extraction-system.md) for extraction cost rules.
+
 ```json
 {
   "floors": [
@@ -662,7 +664,6 @@ interface DungeonSystem {
       "eventRooms": 1,
       "restRooms": 0,
       "eliteChance": 0.00,
-      "extractionCost": "free",
       "layoutType": "linear"
     },
     {
@@ -673,7 +674,6 @@ interface DungeonSystem {
       "eventRooms": 1,
       "restRooms": 0,
       "eliteChance": 0.10,
-      "extractionCost": "free",
       "layoutType": "linear"
     },
     {
@@ -684,10 +684,6 @@ interface DungeonSystem {
       "eventRooms": 1,
       "restRooms": 0,
       "eliteChance": 0.10,
-      "extractionCost": {
-        "goldPercent": 0.15,
-        "minGold": 10
-      },
       "layoutType": "linear"
     },
     {
@@ -699,11 +695,6 @@ interface DungeonSystem {
       "restRooms": 0,
       "eliteChance": 0.10,
       "hasArmoredEnemies": true,
-      "extractionCost": {
-        "goldPercent": 0.25,
-        "minGold": 20,
-        "allowItem": true
-      },
       "layoutType": "linear"
     },
     {

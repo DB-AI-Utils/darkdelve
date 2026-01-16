@@ -205,7 +205,6 @@ interface DreadChangeRequest {
 type DreadSource =
   // Combat sources
   | { type: 'kill_enemy'; enemyType: EnemyType; enemyId: string }
-  | { type: 'combat_damage_taken'; amount: number }
 
   // Exploration sources
   | { type: 'exploration_turns'; turnCount: number }

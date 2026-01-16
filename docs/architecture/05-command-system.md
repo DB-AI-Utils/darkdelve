@@ -328,8 +328,10 @@ interface MerchantBuybackCommand {
   itemId: EntityId;
 }
 
-interface MerchantIdentifyCommand {
-  type: 'MERCHANT_IDENTIFY';
+// ==================== Chronicler Commands ====================
+
+interface ChroniclerIdentifyCommand {
+  type: 'CHRONICLER_IDENTIFY';
   itemId: EntityId;
 }
 
@@ -542,7 +544,9 @@ type GameCommand =
   | MerchantBuyCommand
   | MerchantSellCommand
   | MerchantBuybackCommand
-  | MerchantIdentifyCommand
+
+  // Chronicler
+  | ChroniclerIdentifyCommand
 
   // Navigation
   | MoveToRoomCommand
@@ -636,11 +640,11 @@ const PHASE_COMMANDS: Record<GamePhase, GameCommand['type'][]> = {
     'MERCHANT_BUY',
     'MERCHANT_SELL',
     'MERCHANT_BUYBACK',
-    'MERCHANT_IDENTIFY',
     'CAMP_RETURN_TO_MAIN',
   ],
 
   camp_chronicler: [
+    'CHRONICLER_IDENTIFY',
     'CAMP_RETURN_TO_MAIN',
   ],
 

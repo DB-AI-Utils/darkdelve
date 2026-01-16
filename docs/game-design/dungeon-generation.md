@@ -117,7 +117,9 @@ To avoid "seed exhaustion" (players seeing all variants quickly):
 
 ### Layout Templates
 
-**3 Layout Templates per Floor Type:**
+> **MVP Scope**: MVP uses linear corridor layout only (Template A simplified). Templates B and C with branching/loops are post-MVP enhancements.
+
+**3 Layout Templates per Floor Type (Post-MVP):**
 
 ```
 LAYOUT TEMPLATE A: Linear Branch

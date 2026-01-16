@@ -672,13 +672,13 @@ const CHARACTER_CONSTANTS = {
   // Damage
   DAMAGE_PER_MIGHT: 1,
 
-  // Crit
+  // Crit (values from docs/game-design/combat.md - design is authoritative)
   BASE_CRIT_CHANCE: 0.05,           // 5%
   CRIT_PER_CUNNING_NORMAL: 0.03,    // 3% per point (1-10)
   CRIT_PER_CUNNING_DIMINISHING: 0.015, // 1.5% per point (11+)
   CUNNING_DIMINISHING_THRESHOLD: 10,
   CRIT_CHANCE_CAP: 0.65,            // 65%
-  CRIT_MULTIPLIER: 1.5,             // 150% damage on crit
+  CRIT_MULTIPLIER: 2.5,             // 250% damage on crit
 
   // DoT Resistance
   DOT_RESISTANCE_PER_VIGOR: 0.05,   // 5% per VIGOR

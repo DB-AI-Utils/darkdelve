@@ -15,6 +15,8 @@ The extraction mechanic is the game's primary hook—a constant push-your-luck d
 | 4 | Must find Waystone | 25% gold (minimum 25 gold) OR 1 item |
 | 5 | Boss guards the exit | Defeat boss |
 
+> **Canonical source:** `configs/extraction.json` — This design document is authoritative for extraction rules. The architecture implements these values in `configs/extraction.json`.
+
 **Extraction Cost Rules:**
 - Minimum costs prevent "zero-gold" exploit (spending all gold before extraction)
 - If player has insufficient gold on Floor 3-4, they may sacrifice 1 item instead

@@ -910,7 +910,11 @@ interface FleeAttemptResult {
   /** Roll result */
   roll: number;
 
-  /** Dread cost (applied on success) */
+  /**
+   * Dread cost for this outcome.
+   * Per design (combat.md): success = +5, failure = +2.
+   * Failure also causes lost turn (handled by combat flow).
+   */
   dreadCost: number;
 }
 
@@ -1019,6 +1023,8 @@ function createStaggerResolver(config: CombatConfig): StaggerResolver;
 ## Configuration Files
 
 ### configs/combat.json
+
+> **Source of truth:** `docs/game-design/combat.md` is authoritative for combat balance values. This example must stay in sync with design.
 
 ```json
 {
