@@ -6,70 +6,6 @@ Complete specification for item data structures, effects, and identification mec
 
 ---
 
-## Item Data Schema
-
-### Core Item Structure
-
-```typescript
-interface Item {
-  id: string;                    // Unique instance ID (UUID)
-  templateId: string;            // Reference to item template
-  slot: ItemSlot;                // WEAPON, ARMOR, HELM, ACCESSORY, CONSUMABLE
-  rarity: Rarity;                // COMMON, UNCOMMON, RARE, EPIC, LEGENDARY
-  identified: boolean;           // True if stats/effects revealed
-
-  // Display names
-  name: string;                  // Current display name
-  unidentifiedName: string;      // "??? Sword"
-  identifiedName: string;        // "Rusty Sword"
-  flavorText: string;            // Lore description
-
-  // Stats (equipment only)
-  baseStats: StatBlock | null;
-
-  // Effects (equipment and consumables)
-  effects: ItemEffect[];
-
-  // Consumable-specific
-  consumable: ConsumableData | null;
-
-  // Special flags
-  cursed: boolean;
-  questItem: boolean;            // Cannot be sold or discarded
-}
-```
-
-### Stat Block
-
-```typescript
-interface StatBlock {
-  // Weapon stats
-  damageMin?: number;
-  damageMax?: number;
-
-  // Defensive stats
-  bonusHP?: number;
-  armor?: number;                // Percentage damage reduction
-
-  // Attribute bonuses
-  vigor?: number;
-  might?: number;
-  cunning?: number;
-}
-```
-
-### Consumable Data
-
-```typescript
-interface ConsumableData {
-  uses: number;                  // Number of uses (usually 1)
-  useInCombat: boolean;
-  useOutOfCombat: boolean;
-}
-```
-
----
-
 ## Effect System
 
 ### Effect Types
@@ -102,19 +38,6 @@ interface ConsumableData {
 | | CURSE_DREAD_GAIN | +X% Dread gain |
 | | CURSE_DAMAGE_TAKEN | +X% damage taken |
 | | CURSE_NO_HEAL | Cannot heal |
-
-### Effect Structure
-
-```typescript
-interface ItemEffect {
-  type: EffectType;
-  magnitude: number;             // Percentage, flat value, etc.
-  duration?: number;             // For buffs: turns remaining
-  chance?: number;               // For procs: 0-100
-  description: string;           // Human-readable
-  hiddenUntilIdentified: boolean;
-}
-```
 
 ### Effect Stacking Rules
 
@@ -152,8 +75,8 @@ When unidentified, player sees:
 
 | Rule | Specification |
 |------|---------------|
-| Equip unidentified? | Allowed - player takes the risk |
-| Curse activation | Applies immediately on equip, even if unidentified |
+| Equip unidentified? | Not allowed - must identify before equipping |
+| Curse activation | Applies immediately on equip |
 | Use unidentified consumable? | Allowed - using reveals effect |
 | Sell unidentified? | Allowed at 50% value |
 
@@ -184,136 +107,6 @@ Dread affects how items are DISPLAYED, not their actual values.
 | Terrified (85+) | Stats shown as "???" 25% of the time |
 
 **Critical Rule:** Underlying item data is unchanged. Only display is corrupted.
-
----
-
-## Item Examples
-
-### Common Weapon
-
-```json
-{
-  "id": "item_001",
-  "templateId": "rusty_sword",
-  "slot": "WEAPON",
-  "rarity": "COMMON",
-  "identified": true,
-  "identifiedName": "Rusty Sword",
-  "unidentifiedName": "??? Sword",
-  "flavorText": "Its edge is dull, but desperation sharpens all blades.",
-  "baseStats": {
-    "damageMin": 5,
-    "damageMax": 8
-  },
-  "effects": [],
-  "consumable": null,
-  "cursed": false,
-  "questItem": false
-}
-```
-
-### Rare Accessory with Effects
-
-```json
-{
-  "id": "item_002",
-  "templateId": "ring_of_shadows",
-  "slot": "ACCESSORY",
-  "rarity": "RARE",
-  "identified": true,
-  "identifiedName": "Ring of Shadows",
-  "unidentifiedName": "??? Ring",
-  "flavorText": "Darkness clings to it like a lover.",
-  "baseStats": {
-    "cunning": 2
-  },
-  "effects": [
-    {
-      "type": "CRIT_CHANCE",
-      "magnitude": 10,
-      "description": "+10% Critical Chance",
-      "hiddenUntilIdentified": true
-    },
-    {
-      "type": "ON_HIT_BONUS_DAMAGE",
-      "magnitude": 5,
-      "chance": 20,
-      "description": "20% chance for +5 bonus damage",
-      "hiddenUntilIdentified": true
-    }
-  ],
-  "consumable": null,
-  "cursed": false,
-  "questItem": false
-}
-```
-
-### Cursed Epic Weapon
-
-```json
-{
-  "id": "item_003",
-  "templateId": "cursed_bloodletter",
-  "slot": "WEAPON",
-  "rarity": "EPIC",
-  "identified": true,
-  "identifiedName": "Bloodletter",
-  "unidentifiedName": "??? Blade",
-  "flavorText": "It drinks deep, but so does the darkness.",
-  "baseStats": {
-    "damageMin": 14,
-    "damageMax": 20
-  },
-  "effects": [
-    {
-      "type": "LIFESTEAL",
-      "magnitude": 15,
-      "description": "Lifesteal: Heal for 15% of damage dealt",
-      "hiddenUntilIdentified": false
-    },
-    {
-      "type": "CURSE_DREAD_GAIN",
-      "magnitude": 25,
-      "description": "CURSED: +25% Dread gain while equipped",
-      "hiddenUntilIdentified": true
-    }
-  ],
-  "consumable": null,
-  "cursed": true,
-  "questItem": false
-}
-```
-
-### Consumable
-
-```json
-{
-  "id": "item_004",
-  "templateId": "healing_potion",
-  "slot": "CONSUMABLE",
-  "rarity": "COMMON",
-  "identified": true,
-  "identifiedName": "Healing Potion",
-  "unidentifiedName": "??? Potion",
-  "flavorText": "Bitter but effective.",
-  "baseStats": null,
-  "effects": [
-    {
-      "type": "ACTIVE_HEAL",
-      "magnitude": 30,
-      "description": "Restore 30 HP",
-      "hiddenUntilIdentified": false
-    }
-  ],
-  "consumable": {
-    "uses": 1,
-    "useInCombat": true,
-    "useOutOfCombat": true
-  },
-  "cursed": false,
-  "questItem": false
-}
-```
 
 ---
 
@@ -376,20 +169,6 @@ INVENTORY (3/8 slots)
 
 Equip this cursed weapon? [Y/N]
 > _
-```
-
----
-
-## Save Schema
-
-For persistence, items are saved minimally:
-
-```typescript
-interface SavedItem {
-  id: string;
-  templateId: string;
-  identified: boolean;
-}
 ```
 
 All other data is derived from the item template combined with identification state at load time.
@@ -456,8 +235,8 @@ When loot drops and inventory is full, loot remains in room. Player may return a
 | Rule | Specification |
 |------|---------------|
 | Equip Binding | Cursed items cannot be unequipped once equipped |
-| Unidentified Equip | Curse activates immediately, even if unidentified |
-| Curse Discovery | Cursed status revealed on first equip |
+| Unidentified Equip | Not allowed - identify required before equipping |
+| Curse Discovery | Cursed status revealed on identification |
 | Removal Methods | Death (item lost), Purging Stone (rare), Purification Shrine |
 
 ### Curse Effects
@@ -480,10 +259,6 @@ Cursed items are **powerful but costly**:
 - Damage: 14-20 (+40% vs Rare baseline)
 - Lifesteal: 15%
 - CURSED: +25% Dread gain
-
-### Cursed Item Death Recovery
-
-Cursed items follow standard death recovery rules. If Equipped + Identified, they return to stash (still cursed). The curse persists on the item.
 
 ### Hollowed One Class Interaction
 

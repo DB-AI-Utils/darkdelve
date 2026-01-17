@@ -117,7 +117,7 @@ TOTAL CRIT CAP: 65% (from all sources combined)
 
 **XP Calculation Assumptions:**
 The XP targets in the Progression Metrics section (~740 XP for a standard run) are based on:
-- Combat rooms: ~60% of total rooms (4-5 combat rooms per 4-room floor)
+- Combat rooms: 2 per floor on Floors 1-4, 4 on Floor 5 (Stairwell excluded)
 - Standard run (F1-4): ~10 combat encounters total
 - Elite spawn rate: 10-15% on Floors 3-4 (expect 1-2 elite encounters per standard run)
 - These targets assume typical encounter distribution, not worst/best case scenarios
@@ -327,8 +327,8 @@ The Merchant sells **accessories only**—weapons, armor, and helms must be foun
 ## Timing
 
 - Combat encounter: 1.5-2 minutes (target), 2.5 minutes (max acceptable)
-- Full floor: 4-9 minutes (varies by room count: Floor 1-4 = 4-5 min, Floor 5 = 9 min)
-- Full dungeon: 20-28 minutes (23 rooms total)
+- Full floor: 4-9 minutes (Floor 1-4 = 5 rooms incl. Stairwell, Floor 5 = 8 rooms incl. Stairwell)
+- Full dungeon: 20-28 minutes (28 rooms total, including Stairwells)
 
 ---
 
@@ -500,12 +500,12 @@ Use these metrics during playtesting:
 *Previously Resolved:*
 
 **B-025: Floor 4 Difficulty Spike**
-- Redistributed room count: Floor 4 (5→4 rooms), Floor 5 (6→7 rooms)
+- Redistributed encounter room count: Floor 4 (5→4), Floor 5 (6→7)
 - Floor Introduction Sequence revised:
   1. Floors 1-2: Core mechanics, free extraction
   2. Floor 3: Waystone cost (economic pressure)
   3. Floor 4: Armored enemies + Shadow Stalker ambush mechanic
-  4. Floor 5: Room count increase + Boss
+  4. Floor 5: Encounter room count increase + Boss
 
 **B-027: Floor 3 Mechanic Stacking**
 - **Problem:** Floor 3 introduced TWO major changes simultaneously (Waystone cost AND Armored Ghoul), violating "one major mechanic per floor" principle
@@ -562,9 +562,8 @@ Use these metrics during playtesting:
 - Loot remains in room; player may return after freeing inventory space; room state persists until run ends
 
 **E-003: Cursed Item Death Recovery**
-- **Problem:** Unclear if curse overrides EQUIPPED+IDENTIFIED death recovery rule
-- **Resolution:** Added "Cursed Item Death Recovery" subsection to `items.md` Cursed Item Mechanics
-- Cursed items follow standard death recovery rules; curse persists on the item
+- **Problem:** Unclear if curse overrides full-loss death rules
+- **Resolution:** Clarified that death always loses all items, including cursed items
 
 **E-004: Same Shrine Blessing Re-selected**
 - **Problem:** Undefined behavior when player selects their current blessing type
@@ -716,13 +715,13 @@ Resolved blockers 3-9 and Floor 3 Difficulty Spike. Completed full 10-enemy MVP 
 - Build parity preserved: ALL MIGHT (+19 flat damage) remains competitive with ALL CUNNING (53% crit) for pure DPS
 
 *Floor 3 Difficulty Spike Resolution (Progression Issue #1):*
-- **Problem:** Floor 3 stacked THREE changes: room count increase (4→5), Waystone cost, harder enemies
-- **Solution:** Hybrid approach—reduce Floor 3 to 4 rooms, keep Waystone cost, smooth enemy distribution
-- Floor 3 rooms: 5 → 4 (single mechanic introduction: Waystone cost only)
-- Floor 4 now introduces room count increase (paired with epic loot reward)
+- **Problem:** Floor 3 stacked THREE changes: encounter room count increase (4→5), Waystone cost, harder enemies
+- **Solution:** Hybrid approach—reduce Floor 3 to 4 encounter rooms, keep Waystone cost, smooth enemy distribution
+- Floor 3 encounter rooms: 5 → 4 (single mechanic introduction: Waystone cost only)
+- Floor 4 now introduces encounter room count increase (paired with epic loot reward)
 - Shadow Stalker: Floor range 3-5 → 4-5 (delayed to reduce Floor 3 spike)
 - Fleshweaver: Floor range 3-5 → 4-5 (elite delayed to Floor 4+)
-- Total dungeon rooms: 24 → 23
+- Total encounter rooms: 24 → 23
 - Session timing improved: Standard Run 22 min → 20 min (closer to 12-18 min target)
 - Restores "one major mechanic per floor" design principle
 
@@ -841,9 +840,9 @@ Comprehensive review pass incorporating combat balance research (Hades, Dead Cel
 
 *Dungeon Structure & Pacing:*
 - Updated session length targets: Quick 5-10min, Standard 12-18min, Deep 20-30min
-- Added room counts per floor: F1-2 = 4 rooms, F3-4 = 5 rooms, F5 = 6 rooms, total 24 rooms
+- Added encounter room counts per floor: F1-2 = 4, F3-4 = 5, F5 = 6 (excluding stairwell)
 - Added floor layout breakdown with room time budget (1-1.5 min/room average)
-- Staggered mechanic introductions: Elites (F2), Waystone cost (F3), Room count increase (F4)
+- Staggered mechanic introductions: Elites (F2), Waystone cost (F3), Encounter room count increase (F4)
 - Added pacing guarantee: 1 non-combat option required after 2 consecutive combat rooms
 - Clarified Floor 5 extraction rules: NO Waystone extraction, boss is only exit
 - Added boss soft-gating design: NPC warnings, minimum stats, death teaches patterns
@@ -897,14 +896,14 @@ Comprehensive review pass incorporating combat balance research (Hades, Dead Cel
 
 - Resolved all 18 open design questions via collaborative game design review
 - Reduced Dread accumulation values by 30% (target 40-60 at extraction)
-- Changed camp from full Dread reset to -25 (min 10) fixed reduction
+- Clarified Dread reset at run start (no persistence into camp)
 - Updated Dread thresholds with progressive hallucination rates (5%/15%/25%)
 - Added The Watcher warning phase at 85 Dread with stats
 - Updated flee mechanics (Dread penalty instead of gold drop, restrictions on round 1/ambush)
 - Updated floor curse chances (5/10/15/20/25% instead of 0/0/20/40/60%)
 - Updated class unlocks: mixed methods (Flagellant via survival, Hollowed One via death at 100 Dread)
 - Added Lesson Learned mechanic on death (+10% damage to killer enemy type)
-- Updated death economy (equipped items safe, carried items lost)
+- Updated death economy (full loss on death)
 - Added three-tiered Veteran Knowledge unlock system (5/15/25 encounters)
 - Defined MVP enemy roster (Ghoul, Plague Rat, Fleshweaver, Bone Colossus)
 - Defined MVP item pool (25 items: 7 weapons, 5 armor, 5 accessories, 8 consumables)

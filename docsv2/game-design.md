@@ -128,11 +128,12 @@ Every interaction is a decision with consequences. Chests might alert enemies or
 
 | Run Type | Floors | Rooms | Time | Risk Level |
 |----------|--------|-------|------|------------|
-| Quick raid | 1-2 | 8 | 5-10 min | Low |
-| Standard run | 1-4 | 17 | 14-20 min | Medium |
-| Deep dive | 1-5 | 23 | 20-28 min | High |
+| Quick raid | 1-2 | 10 | 5-10 min | Low |
+| Standard run | 1-4 | 20 | 14-20 min | Medium |
+| Deep dive | 1-5 | 28 | 20-28 min | High |
 
 Players control session length by choosing when to extract. Combat must average 1.5-2 minutes to hit these targets.
+Room counts include the Stairwell room on each floor; Stairwells are low-interaction and do not materially change time targets.
 
 → *Full details: [Dungeon Structure](game-design/dungeon-structure.md), [Combat](game-design/combat.md)*
 

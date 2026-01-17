@@ -94,7 +94,7 @@ CONSUMABLES (2/3)
 ```
 
 **Inventory Rules:**
-- Cannot pick up items when inventory is full - must drop or equip something first
+- Cannot pick up items when inventory is full - must drop something or equip an identified item first
 - Equipping an item frees an inventory slot
 - Equipped items do not consume inventory space
 
@@ -171,12 +171,12 @@ This means "+50% loot quality at max Dread" translates to a 50% chance for any d
 
 - Items drop UNIDENTIFIED
 - Identification costs 25 gold at camp OR rare scrolls in dungeon
-- Creates tension: spend resources to understand loot, or gamble on unknown gear?
+- Creates tension: spend resources to understand loot, or sell it unidentified
 
 **What Identification Does:**
 - Reveals true stats and effects
 - Enables selling at full value (unidentified = 50% value)
-- Required to equip items with active abilities
+- Required to equip items; unidentified equipment cannot be equipped
 - Reveals curses before equipping
 
 **What Identification Does NOT Do:**

@@ -82,7 +82,7 @@ To avoid "seed exhaustion" (players seeing all variants quickly):
 ### Phase 1: Minimal Viable Hybrid (MVP)
 
 - Fixed 5-floor structure with boss on floor 5
-- Randomized room ORDER within floors (4-6 rooms per floor)
+- Randomized room ORDER within floors (5-8 rooms per floor, including Stairwell)
 - Enemy composition from fixed roster, scaled by floor
 - Single event pool
 - Basic loot tables per dungeon
@@ -117,10 +117,9 @@ To avoid "seed exhaustion" (players seeing all variants quickly):
 
 ### Layout Templates
 
-> **MVP Scope**: MVP uses linear corridor layout only (Template A simplified). Templates B and C with branching/loops are post-MVP enhancements.
+> **MVP Scope**: MVP uses templates A/B/C per the assignment below, including loops and branches.
 
-**3 Layout Templates per Floor Type (Post-MVP):**
-
+**Layout Templates:**
 ```
 LAYOUT TEMPLATE A: Linear Branch
 ================================
@@ -159,56 +158,23 @@ Best for: Floor 4-5 (commitment to exploration)
 
 | Floor | Room Count | Templates Used |
 |-------|------------|----------------|
-| 1 | 4 rooms | A (80%), B (20%) |
-| 2 | 4 rooms | A (50%), B (50%) |
-| 3 | 4 rooms | B (60%), C (40%) |
-| 4 | 4 rooms | B (40%), C (60%) |
-| 5 | 7 rooms | C only |
+| 1 | 5 rooms | A (80%), B (20%) |
+| 2 | 5 rooms | A (50%), B (50%) |
+| 3 | 5 rooms | B (60%), C (40%) |
+| 4 | 5 rooms | B (40%), C (60%) |
+| 5 | 8 rooms | C only |
+
+Room counts include the Stairwell room (represented as the [Exit] node in templates).
 
 ### Room Type Distribution
 
-| Floor | Combat | Treasure | Event | Boss | Total |
-|-------|--------|----------|-------|------|-------|
-| 1 | 2 | 1 | 1 | 0 | 4 |
-| 2 | 2 | 1 | 1 | 0 | 4 |
-| 3 | 2 | 1 | 1 | 0 | 4 |
-| 4 | 2 | 1 | 1 | 0 | 4 |
-| 5 | 4 | 1 | 1 | 1 | 7 |
-
-### Generation Pseudocode
-
-```
-function generateFloor(floorNumber):
-    // Step 1: Select template
-    template = selectTemplate(floorNumber)
-
-    // Step 2: Create room slots
-    rooms = createRoomsFromTemplate(template)
-
-    // Step 3: Assign room types
-    roomTypes = getRoomTypeDistribution(floorNumber)
-    shuffle(roomTypes)
-
-    // Boss room is furthest from entrance (Floor 5)
-    if floorNumber == 5:
-        furthestRoom = findFurthestRoom(rooms)
-        furthestRoom.type = BOSS
-        roomTypes.remove(BOSS)
-
-    // Assign remaining types
-    for room in rooms:
-        if room.type == null:
-            room.type = roomTypes.pop()
-
-    // Step 4: Validate connectivity
-    assert allRoomsReachable(rooms)
-
-    // Step 5: Generate contents
-    for room in rooms:
-        room.contents = generateContents(room.type, floorNumber)
-
-    return Floor(rooms)
-```
+| Floor | Combat | Treasure | Event | Boss | Stairwell | Total |
+|-------|--------|----------|-------|------|-----------|-------|
+| 1 | 2 | 1 | 1 | 0 | 1 | 5 |
+| 2 | 2 | 1 | 1 | 0 | 1 | 5 |
+| 3 | 2 | 1 | 1 | 0 | 1 | 5 |
+| 4 | 2 | 1 | 1 | 0 | 1 | 5 |
+| 5 | 4 | 1 | 1 | 1 | 1 | 8 |
 
 ### Enemy Composition Pools
 
@@ -221,13 +187,6 @@ function generateFloor(floorNumber):
 | 3 | Ghoul, Plague Ghoul, Skeleton Archer |
 | 4 | Ghoul, Armored Ghoul, Shadow Stalker, Corpse Shambler, Fleshweaver (Elite) |
 | 5 | Armored Ghoul, Shadow Stalker, Corpse Shambler, Bone Knight (Elite), Fleshweaver (Elite) |
-
-### Seed-Based Generation
-
-```
-Floor seed = hash(run_id + floor_number)
-Room content seed = hash(floor_seed + room_id)
-```
 
 This ensures:
 - Same run_id produces same dungeon

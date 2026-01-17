@@ -151,45 +151,6 @@ JSON chosen for:
 - Easy version migration
 - Native support in all target languages
 
-### File Structure
-
-**Single File:** `darkdelve_save.json`
-
-```json
-{
-  "version": "1.0.0",
-  "saveTimestamp": "2026-01-15T14:30:00Z",
-  "checksum": "sha256:abc123...",
-
-  "character": {
-    "name": "Valdris",
-    "class": "Mercenary",
-    "level": 5,
-    "xp": 340,
-    "stats": { "vigor": 4, "might": 5, "cunning": 3 },
-    "equipment": {
-      "weapon": { "id": "item_001", "templateId": "iron_longsword", "identified": true },
-      "armor": { "id": "item_002", "templateId": "chainmail_shirt", "identified": true },
-      "helm": null,
-      "accessory": { "id": "item_003", "templateId": "copper_ring", "identified": false }
-    }
-  },
-
-  "stash": [
-    { "id": "item_004", "templateId": "soulreaver_axe", "identified": true }
-  ],
-
-  "gold": 245,
-  "veteranKnowledge": { "ghoul": { "encounters": 15, "deaths": 0, "tier": 2 } },
-  "bestiary": { "ghoul": true, "plague_rat": true },
-  "unlocks": { "classes": ["Mercenary"], "items": [], "mutators": [] },
-  "statistics": { "runsCompleted": 8, "runsFailed": 12, "totalGoldEarned": 1840, "deepestFloor": 5, "bossesDefeated": 1 },
-  "lessonLearned": { "enemyType": "shadow_stalker", "runsRemaining": 1 },
-  "eventMemory": { "woundedAdventurerHelped": true },
-  "settings": { "currentDread": 15 }
-}
-```
-
 ### Version Scheme
 
 **Semantic Versioning:** `MAJOR.MINOR.PATCH`

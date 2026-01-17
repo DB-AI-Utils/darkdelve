@@ -10,25 +10,6 @@
 
 Rooms connect via corridors forming a directed graph with symmetric edges (if A connects to B, B connects to A). This allows designers to create interesting topology with dead ends, loops, and chokepoints.
 
-```
-Room {
-  id: string            // "floor2_room3"
-  type: RoomType        // COMBAT, TREASURE, EVENT, REST, BOSS, STAIRS
-  state: RoomState      // UNEXPLORED, ENTERED, CLEARED
-  connections: RoomConnection[]
-}
-
-RoomConnection {
-  targetRoomId: string
-  direction: Direction  // NORTH, EAST, SOUTH, WEST (for display)
-}
-
-RoomState:
-  UNEXPLORED = Never entered, shows as '?' on map
-  ENTERED = Currently occupied or previously visited but not cleared
-  CLEARED = All threats neutralized, safe to traverse
-```
-
 ### Movement Input Method
 
 Players select numbered corridor options rather than cardinal directions:
@@ -88,6 +69,8 @@ Input: Single digit (1-4) or 'B' for backtrack.
 Each floor has exactly ONE Stairwell room containing:
 - Stairs Down (leads to next floor)
 - Extraction Point (Floors 1-4 only; Floor 5 has none)
+
+The Stairwell counts as one of the floor's rooms.
 
 Stairwell properties:
 - Visible on map from start (marked with ↓)
@@ -160,13 +143,13 @@ Each dungeon has 5 floors with escalating risk and reward:
 
 | Floor | Rooms | Duration | Difficulty | Key Feature |
 |-------|-------|----------|------------|-------------|
-| 1 | 4 | ~4 min | Easy | Introductory floor, free extract |
-| 2 | 4 | ~5 min | Medium | Elites introduced (10% spawn) |
-| 3 | 4 | ~5 min | Hard | Waystone extraction costs begin |
-| 4 | 4 | ~5 min | Very Hard | Armored enemies, Shadow Stalker ambush, epic loot |
-| 5 | 7 | ~9 min | Extreme | Room count increase, Boss, Legendary chance |
+| 1 | 5 | ~4 min | Easy | Introductory floor, free extract |
+| 2 | 5 | ~5 min | Medium | Elites introduced (10% spawn) |
+| 3 | 5 | ~5 min | Hard | Waystone extraction costs begin |
+| 4 | 5 | ~5 min | Very Hard | Armored enemies, Shadow Stalker ambush, epic loot |
+| 5 | 8 | ~9 min | Extreme | Room count increase, Boss, Legendary chance |
 
-**Total: 23 rooms for full clear = 20-28 minutes**
+**Total: 28 rooms for full clear = 20-28 minutes**
 
 **Mechanic Introduction Principle:** Each floor introduces ONE major new mechanic. Never stack multiple new challenges simultaneously.
 
@@ -266,25 +249,26 @@ The Threshold Chamber offers a **Retreat** option—NOT extraction. This returns
 
 ## Floor Layout
 
-Room breakdown by floor (designed for 1-1.5 min/room average):
+Room breakdown by floor (encounter rooms designed for 1-1.5 min/room average; Stairwell is shorter):
 
 > **MVP Scope**: MVP uses 0 rest rooms on Floor 5. The rest/special room is a post-MVP addition.
 
-| Floor | Combat | Treasure | Event | Rest/Special | Total |
-|-------|--------|----------|-------|--------------|-------|
-| 1 | 2 | 1 | 1 | 0 | 4 |
-| 2 | 2 | 1 | 1 | 0 | 4 |
-| 3 | 2 | 1 | 1 | 0 | 4 |
-| 4 | 2 | 1 | 1 | 0 | 4 |
-| 5 | 4 | 1 | 1 | 1 (+ boss) | 7 |
+| Floor | Combat | Treasure | Event | Rest/Special | Stairwell | Boss | Total |
+|-------|--------|----------|-------|--------------|-----------|------|-------|
+| 1 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
+| 2 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
+| 3 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
+| 4 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
+| 5 | 4 | 1 | 1 | 0 | 1 | 1 | 8 |
 
-*MVP Floor 5: 4 combat, 1 treasure, 1 event, 0 rest = 6 rooms + boss*
+*MVP Floor 5: 4 combat, 1 treasure, 1 event, 0 rest, 1 stairwell, 1 boss = 8 rooms total*
 
 **Room Time Budget:**
 - Combat rooms: 1.5-2 minutes (4-8 turns)
 - Event rooms: 30-60 seconds
 - Treasure rooms: 30-60 seconds
 - Rest sites: 15-30 seconds
+- Stairwell rooms: 15-30 seconds
 
 ---
 

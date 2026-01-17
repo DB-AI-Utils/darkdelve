@@ -7,6 +7,7 @@ DARKDELVE is a single-player, local-only CLI game with future UI expansion. The 
 - TypeScript implementation.
 - Local-only runtime and persistence.
 - Single-player session model.
+- Single local profile (one save file).
 - CLI first, with future graphical and agent interfaces.
 - No external integrations.
 - Data-driven content and balance values.
@@ -19,78 +20,13 @@ DARKDELVE is a single-player, local-only CLI game with future UI expansion. The 
 5. Local persistence with minimal operational overhead.
 
 ## 4. Key Decisions and Trade-offs
-
-### Decision: Overall architecture style
-**Context:** Define how modules are organized for a local game.
-
-**Option A: Modular monolith**
-- Description: Single process with clear module boundaries and explicit APIs.
-- Pros: Simpler debugging, no deployment complexity, fast iteration.
-- Cons: Requires discipline to keep boundaries clean.
-- Best when: Local-only, single-player, CLI-first.
-
-**Option B: Service-oriented split**
-- Description: Separate processes for core, UI, analytics.
-- Pros: Strong isolation, UI can restart independently.
-- Cons: Complex IPC, harder local setup, overkill for scope.
-- Best when: Multi-client or remote services required.
-
-**Recommendation:** Modular monolith.
-**Decision required from:** Architect (this doc) and tech lead confirmation.
-
-### Decision: Core and presentation communication
-**Context:** Support CLI and future UIs without changing game logic.
-
-**Option A: Command and query API with event stream**
-- Description: Core exposes commands and state queries; emits events for presentation.
-- Pros: Clean separation, easy to add UI adapters, testable.
-- Cons: Requires consistent event schema.
-- Best when: Multiple presentations or agent mode needed.
-
-**Option B: Presentation-driven state mutation**
-- Description: UI directly manipulates state objects.
-- Pros: Simple in the short term.
-- Cons: Tight coupling, brittle for future UI expansion.
-- Best when: Single UI forever.
-
-**Recommendation:** Command and query API with event stream.
-**Decision required from:** Architect (this doc) and tech lead confirmation.
-
-### Decision: Persistence approach
-**Context:** Save profiles, runs, and unlocks locally.
-
-**Option A: File-based JSON store**
-- Description: Serialize domain state to local JSON files per profile.
-- Pros: Human-readable, easy backups, no dependencies.
-- Cons: Requires versioning and migration rules.
-- Best when: Local-only with modest data size.
-
-**Option B: Embedded database**
-- Description: Use a local embedded DB for structured persistence.
-- Pros: Stronger query support, transactional updates.
-- Cons: More complexity, adds dependency and schema management.
-- Best when: Large datasets or complex queries.
-
-**Recommendation:** File-based JSON store with explicit versioning.
-**Decision required from:** Tech lead confirmation.
-
-### Decision: Data-driven content and balance
-**Context:** Designers must tune without code changes.
-
-**Option A: External JSON with a Content Registry**
-- Description: Load content and configs from external JSON; systems query registry.
-- Pros: Fast iteration, validation, easy modding.
-- Cons: Requires robust validation and tooling.
-- Best when: Balance is expected to change frequently.
-
-**Option B: Hardcoded data in source**
-- Description: Content defined in code constants.
-- Pros: Simpler to implement initially.
-- Cons: Slows iteration and blocks non-engineers.
-- Best when: Toy prototypes.
-
-**Recommendation:** External JSON with a Content Registry.
-**Decision required from:** Architect (this doc) and tech lead confirmation.
+- Architecture style: modular monolith for a local-only, single-process runtime.
+- Core/presentation boundary: command and query API with an event stream.
+- Persistence: single JSON save file with explicit versioning; no mid-dungeon saves.
+- Content and balance source: external JSON with a Content Registry.
+- Validation timing: fail fast at startup; dev hot-reload keeps last known good data.
+- Analytics: minimal local JSON event set.
+- Agent mode: included in MVP with structured JSON output.
 
 ## 5. System Overview
 Actors:
@@ -101,7 +37,7 @@ High-level flow:
 - Presentation translates input into commands.
 - Game Core validates commands, mutates state, emits events.
 - Presentation queries state and renders output.
-- Persistence stores and restores profiles and run state.
+- Persistence stores and restores the single profile; mid-dungeon run state is not persisted.
 - Analytics captures structured events locally.
 
 ## 6. Component Architecture
@@ -132,7 +68,7 @@ High-level flow:
 - Rule Evaluation: shared rules for validation and calculations.
 
 **Persistence and Analytics**
-- Profile Store: local persistence for profiles, saves, stash, unlocks.
+- Profile Store: local persistence for the single profile, saves, stash, unlocks (camp-only).
 - Analytics Logger: local event capture for later analysis.
 
 ## 7. Module Boundaries (High Level)
@@ -201,7 +137,7 @@ High-level flow:
 - Requires: dungeon state, dread level, inventory state.
 
 ### Module: Items and Loot
-**Responsibility:** Inventory, drops, identification.
+**Responsibility:** Inventory, drops, identification, equip eligibility.
 **Boundaries:**
 - OWNS: item state and loot selection.
 - DOES NOT OWN: combat math.
@@ -246,12 +182,12 @@ High-level flow:
 - Requires: external JSON sources.
 
 ### Module: Profile Store
-**Responsibility:** Persist profile state and run snapshots.
+**Responsibility:** Persist profile state and camp checkpoints (no mid-run snapshots).
 **Boundaries:**
 - OWNS: serialization formats and versioning.
 - DOES NOT OWN: gameplay rules.
 **Interfaces:**
-- Provides: loadProfile, saveProfile, listProfiles.
+- Provides: loadProfile, saveProfile.
 - Requires: local filesystem.
 
 ### Module: Analytics Logger
@@ -286,19 +222,7 @@ interface GameCore {
 - Event stream used for presentation and analytics.
 - All tunable values are externalized.
 
-## 11. Decision Log
-| Decision | Options Considered | Choice | Rationale |
-| --- | --- | --- | --- |
-| Architecture style | Modular monolith, service split | Modular monolith | Local-only scope, simple deployment |
-| Core/presentation boundary | Command-query API, direct state mutation | Command-query API | Future UI support, testability |
-| Persistence | JSON files, embedded DB | JSON files | Low complexity, local-only |
-| Content source | External JSON, hardcoded | External JSON | Data-driven iteration |
-| MVP module scope | Core-only subset, all modules with phased depth | All modules listed in Section 6 | MVP covers all systems, with depth limited by design MVP scope |
-| Content validation timing | Fail fast at startup, lazy/partial validation | Fail fast at startup | Early error detection; avoids mid-run corruption |
-| Analytics schema & retention | Minimal subset, full event stream | Minimal subset (local JSON) | Keeps scope light while enabling later analysis |
-| Agent mode timing | Post-MVP, MVP | MVP | Required for AI playtesting and analysis |
-
-## 12. Next Steps for Engineer
+## 11. Next Steps for Engineer
 - Confirm module boundaries and the command/query interface shape.
 - Define concrete TypeScript types for core commands, state snapshots, and event payloads.
 - Implement content validation rules for the registry and error handling strategy.

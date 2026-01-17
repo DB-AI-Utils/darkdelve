@@ -343,9 +343,9 @@ Their journal lies open beside them.
 | Floor | Event Pool |
 |-------|------------|
 | 1 | Standard Chest, Hooded Figure, Safe Alcove |
-| 2 | Standard Chest, Hooded Figure, Safe Alcove, Merchant |
+| 2 | Standard Chest, Hooded Figure, Safe Alcove |
 | 3 | Standard Chest, Locked Chest, Hooded Figure, Wounded Adventurer, Blood Shrine, Purification Shrine |
-| 4 | Locked Chest, Wounded Adventurer, Corrupted Rest, Blood Shrine, Merchant |
+| 4 | Locked Chest, Wounded Adventurer, Corrupted Rest, Blood Shrine |
 | 5 | Locked Chest, Corrupted Rest, Blood Shrine, Purification Shrine, Echo of the Past |
 
 **Event Selection:**
