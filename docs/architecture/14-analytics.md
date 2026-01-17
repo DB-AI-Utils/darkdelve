@@ -24,6 +24,7 @@ Captures and stores gameplay telemetry for AI-driven balance analysis. The analy
 ## Dependencies
 
 - **01-foundation**: Types, Result, FileSystem, Timestamp, Logger, generateEntityId
+- **02-content-registry**: AnalyticsConfig (tracking settings, buffer sizes, flush intervals)
 - **03-state-management**: GameState, ProfileState (for context enrichment)
 - **04-event-system**: EventBus, GameEvent (source of analytics data)
 
@@ -436,8 +437,6 @@ interface MerchantTransactionEvent extends AnalyticsEvent {
     goldBefore: number;
     /** Player gold after */
     goldAfter: number;
-    /** Was item from buyback */
-    fromBuyback: boolean;
     /** Item rarity */
     itemRarity: Rarity;
     /** Item slot */

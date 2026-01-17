@@ -156,6 +156,18 @@ interface ContentRegistry {
 
   /** Get loot generation configuration */
   getLootConfig(): LootConfig;
+
+  /** Get camp configuration */
+  getCampConfig(): CampConfig;
+
+  /** Get dungeon generation configuration */
+  getDungeonConfig(): DungeonConfig;
+
+  /** Get death economy configuration */
+  getDeathEconomyConfig(): DeathEconomyConfig;
+
+  /** Get lesson learned configuration */
+  getLessonLearnedConfig(): LessonLearnedConfig;
 }
 ```
 
@@ -830,29 +842,41 @@ interface DreadThresholdConfig {
 }
 
 interface ExtractionConfig {
-  freeFloors: FloorNumber[];
-
-  costs: {
-    floor3: { goldPercent: number; minGold: number };
-    floor4: { goldPercent: number; minGold: number; allowItem: boolean };
-  };
+  /** Per-floor extraction rules indexed by floor number */
+  floors: Record<FloorNumber, FloorExtractionRule>;
 
   thresholdRetreat: {
-    goldPercent: number;
-    minGold: number;
-    allowItem: boolean;
+    goldPercentage: number;
+    minimumGold: number;
+    allowItemPayment: boolean;
+    itemPaymentCount: number;
+    returnFloor: FloorNumber;
   };
 
-  desperationExtraction: {
-    enabled: boolean;
+  desperation: {
     dreadCost: number;
-    requiresEquipmentSacrifice: boolean;
+    allowEquipmentSacrifice: boolean;
+    protectedSlots: EquipmentSlot[];
+    freeExtractionIfOnlyWeapon: boolean;
   };
+
+  extractionLocations: RoomType[];
 
   taunt: {
     enabled: boolean;
-    excludeLegendary: boolean;
+    showChestType: boolean;
+    highlightOrnateChest: boolean;
+    showEnemyHint: boolean;
+    showEventHint: boolean;
   };
+}
+
+interface FloorExtractionRule {
+  method: 'free' | 'waystone' | 'boss';
+  goldPercentage: number;
+  minimumGold: number;
+  allowItemPayment: boolean;
+  itemPaymentCount: number;
 }
 
 interface ProgressionConfig {
@@ -897,20 +921,43 @@ interface ProgressionConfig {
   lessonLearnedDuration: number;
 }
 
+/**
+ * Merchant configuration for stock and pricing rules.
+ *
+ * Merchant availability is determined by two sources:
+ * 1. ItemTemplate flags (merchantStock, merchantAlwaysAvailable) - defines eligibility
+ * 2. MerchantConfig.alwaysAvailable - explicit overrides with specific prices
+ *
+ * Items appear at merchant if EITHER:
+ * - ItemTemplate.merchantAlwaysAvailable is true, OR
+ * - Listed in MerchantConfig.alwaysAvailable
+ *
+ * Rotating stock uses items where ItemTemplate.merchantStock is true.
+ */
 interface MerchantConfig {
-  // Stock
-  rotatingSlotCount: number;
+  // Always available consumables (explicit list with prices)
+  alwaysAvailable: MerchantStockEntry[];
+
+  // Rotating stock configuration
+  rotatingStock: {
+    consumableSlots: number;
+    rotatingConsumables: string[];
+  };
+
+  // Accessory availability by level (slots and rarities scale with character level)
   accessorySlotsByLevel: { minLevel: number; slots: number; rarities: Rarity[] }[];
 
   // Pricing
-  buybackMarkup: number;
-  sellRatio: number;
+  sellValueMultiplier: number;
+  unidentifiedSellMultiplier: number;
 
-  // Buyback
-  buybackLimit: number;
-
-  // Stock seed
+  // Stock seed (for deterministic rotation)
   stockSeedComponents: ('runNumber' | 'characterLevel' | 'lastExtractionFloor')[];
+}
+
+interface MerchantStockEntry {
+  templateId: string;
+  price: number;
 }
 
 interface AnalyticsConfig {
@@ -966,6 +1013,86 @@ interface LootConfig {
   // Special rates
   bossLegendaryRate: number;
   dreadQualityBonusMultiplier: number;
+}
+
+interface CampConfig {
+  stashCapacity: number;
+  maxBringFromStash: number;
+  consumableSlots: number;
+  maxConsumableStack: number;
+
+  freeStarterPotion: {
+    enabled: boolean;
+    templateId: string;
+    count: number;
+  };
+
+  expeditionLogSize: number;
+}
+
+interface DungeonConfig {
+  floors: FloorConfig[];
+
+  generation: {
+    roomIdPrefix: string;
+    connectionStyle: 'corridor';
+    guaranteeStartSafe: boolean;
+    shuffleRoomOrder: boolean;
+  };
+
+  backtracking: {
+    turnCost: number;
+    requiresCleared: boolean;
+  };
+
+  dreadEliteScaling: {
+    enabled: boolean;
+    baseChance: number;
+    maxChance: number;
+    dreadThreshold: number;
+    scalingStart: number;
+  };
+}
+
+interface FloorConfig {
+  floor: FloorNumber;
+  roomCount: number;
+  combatRooms: number;
+  treasureRooms: number;
+  eventRooms: number;
+  restRooms: number;
+  eliteChance: number;
+  layoutType: 'linear' | 'branching' | 'loop';
+  hasArmoredEnemies?: boolean;
+  hasBoss?: boolean;
+  hasThreshold?: boolean;
+}
+
+interface DeathEconomyConfig {
+  rule: 'full_loss';
+  description: string;
+
+  riskStatusTags: {
+    safe: { color: string; description: string };
+    at_risk: { color: string; description: string };
+  };
+}
+
+interface LessonLearnedConfig {
+  damageBonus: number;
+
+  duration: {
+    runs: number;
+    decrementsAt: 'expedition_start';
+  };
+
+  display: {
+    deathScreen: boolean;
+    runStart: boolean;
+    combatLog: boolean;
+  };
+
+  stacking: 'overwrite';
 }
 ```
 
@@ -1042,7 +1169,11 @@ darkdelve/
 │   ├── progression.json    # ProgressionConfig
 │   ├── merchant.json       # MerchantConfig
 │   ├── analytics.json      # AnalyticsConfig
-│   └── loot.json           # LootConfig
+│   ├── loot.json           # LootConfig
+│   ├── camp.json           # CampConfig
+│   ├── dungeon.json        # DungeonConfig
+│   ├── death-economy.json  # DeathEconomyConfig
+│   └── lesson-learned.json # LessonLearnedConfig
 │
 └── content/
     ├── items/
@@ -1358,10 +1489,18 @@ export type {
   DreadConfig,
   DreadThresholdConfig,
   ExtractionConfig,
+  FloorExtractionRule,
   ProgressionConfig,
   MerchantConfig,
+  MerchantStockEntry,
   AnalyticsConfig,
   LootConfig,
+  CampConfig,
+  StashSortCriteria,
+  DungeonConfig,
+  FloorConfig,
+  DeathEconomyConfig,
+  LessonLearnedConfig,
 
   // Errors
   ContentLoadError,

@@ -12,7 +12,7 @@ Manages the camp hub - the safe zone between dungeon runs where players manage i
 2. Handle stash operations (view, transfer, organize)
 3. Process equipment changes at camp
 4. Coordinate expedition preparation (item selection, consumable loadout)
-5. Manage merchant interactions (buy, sell, buyback)
+5. Manage merchant interactions (buy, sell)
 6. Provide access to The Chronicler (bestiary, veteran knowledge, lore)
 7. Display character progression and stats
 8. Handle level-up stat allocation
@@ -92,14 +92,6 @@ interface CampService {
     state: GameState,
     itemId: EntityId
   ): Result<DropResult, GameError>;
-
-  /**
-   * Sort stash by criteria
-   */
-  sortStash(
-    state: GameState,
-    sortBy: StashSortCriteria
-  ): GameState;
 
   // === Equipment Operations ===
 
@@ -317,19 +309,6 @@ interface MerchantCampService {
   ): Result<SellResult, GameError>;
 
   /**
-   * Get buyback inventory
-   */
-  getBuybackView(state: GameState): BuybackView;
-
-  /**
-   * Buyback recently sold item
-   */
-  buybackItem(
-    state: GameState,
-    buybackId: EntityId
-  ): Result<BuybackResult, GameError>;
-
-  /**
    * Refresh rotating stock (called at session end)
    */
   refreshRotatingStock(
@@ -401,7 +380,6 @@ type CampPhase =
   | 'expedition_confirm'
   | 'merchant'
   | 'merchant_sell'
-  | 'merchant_buyback'
   | 'chronicler'
   | 'chronicler_bestiary'
   | 'chronicler_bestiary_entry'
@@ -412,18 +390,12 @@ type CampPhase =
   | 'character_levelup';
 
 interface StashView {
-  /** Items in stash */
+  /** Items in stash (sorted by rarity descending) */
   items: StashItemView[];
 
   /** Current capacity */
   count: number;
   capacity: number;
-
-  /** Current sort criteria */
-  sortedBy: StashSortCriteria;
-
-  /** Available sort options */
-  sortOptions: StashSortCriteria[];
 }
 
 interface StashItemView {
@@ -440,13 +412,6 @@ interface StashItemView {
   source: ItemSource;
   acquiredAt: Timestamp;
 }
-
-type StashSortCriteria =
-  | 'rarity'
-  | 'slot'
-  | 'name'
-  | 'recent'
-  | 'value';
 
 interface EquipmentView {
   /** Currently equipped items by slot */
@@ -536,9 +501,6 @@ interface MerchantView {
 
   /** Number of items player can sell */
   sellableItemCount: number;
-
-  /** Buyback available */
-  hasBuyback: boolean;
 }
 
 interface MerchantItemView {
@@ -550,19 +512,6 @@ interface MerchantItemView {
   rarity: Rarity;
   description: string;
   inStock: boolean;
-}
-
-interface BuybackView {
-  items: BuybackItemView[];
-}
-
-interface BuybackItemView {
-  id: EntityId;
-  templateId: string;
-  name: string;
-  price: number;
-  canAfford: boolean;
-  originalSellPrice: number;
 }
 
 interface BestiaryView {
@@ -802,13 +751,6 @@ interface SellResult {
   state: GameState;
   soldItem: StashItemView;
   goldReceived: number;
-  addedToBuyback: boolean;
-}
-
-interface BuybackResult {
-  state: GameState;
-  item: StashItemView;
-  goldSpent: number;
 }
 
 interface LevelUpResult {
@@ -839,16 +781,13 @@ interface LevelUpResult {
     "count": 1
   },
 
-  "sortOptions": ["rarity", "slot", "name", "recent", "value"],
-  "defaultSort": "rarity",
-
-  "expeditionLogSize": 20,
-  "buybackLimit": 5,
-  "buybackMarkup": 1.5
+  "expeditionLogSize": 20
 }
 ```
 
-### configs/merchant.json (Camp-Specific Additions)
+### configs/merchant.json
+
+> **Note**: Full schema defined in 02-content-registry.md (`MerchantConfig` interface).
 
 ```json
 {
@@ -859,17 +798,8 @@ interface LevelUpResult {
     { "templateId": "bandage", "price": 10 },
     { "templateId": "calm_draught", "price": 18 }
   ],
-
   "rotatingStock": {
     "consumableSlots": 2,
-    "accessorySlots": 1,
-
-    "accessoryRarityByLevel": {
-      "1": ["common"],
-      "5": ["common", "uncommon"],
-      "10": ["uncommon", "rare"]
-    },
-
     "rotatingConsumables": [
       "id_scroll",
       "smoke_bomb",
@@ -878,10 +808,14 @@ interface LevelUpResult {
       "fortify_elixir"
     ]
   },
-
+  "accessorySlotsByLevel": [
+    { "minLevel": 1, "slots": 1, "rarities": ["common"] },
+    { "minLevel": 5, "slots": 1, "rarities": ["common", "uncommon"] },
+    { "minLevel": 10, "slots": 2, "rarities": ["uncommon", "rare"] }
+  ],
   "sellValueMultiplier": 0.5,
   "unidentifiedSellMultiplier": 0.25,
-  "buybackMarkup": 1.5
+  "stockSeedComponents": ["runNumber", "characterLevel", "lastExtractionFloor"]
 }
 ```
 
@@ -900,7 +834,7 @@ interface LevelUpResult {
 | `STAT_INCREASED` | Stat increased from level up |
 | `SESSION_STARTED` | Expedition begun |
 | `GOLD_CHANGED` | Gold changed (purchase, sale) |
-| `LESSON_LEARNED_DECREMENTED` | Lesson learned run count reduced at expedition start |
+| `LESSON_LEARNED_ACTIVATED` | At expedition start when Lesson Learned is active (includes decremented runsRemaining) |
 
 ---
 
@@ -928,37 +862,23 @@ The camp system operates on state from the State Management module. It does not 
 - `expedition_prep`
 - `expedition_confirm`
 
-**Camp-Specific Transient State:**
+**Expedition Prep State:**
 
-```typescript
-interface CampTransientState {
-  /** Items selected to bring from stash */
-  selectedBringItems: EntityId[];
+Expedition preparation workflow state is stored in `GameState.expeditionPrep` (see 03-state-management.md):
+- `selectedBringItems` - Items selected to bring from stash (max 2)
+- `selectedConsumables` - Consumables selected for the expedition
 
-  /** Consumables selected for expedition */
-  selectedConsumables: ConsumableSelection[];
+This state is created when entering `expedition_prep` phase and cleared when the expedition begins or is cancelled.
 
-  /** Current stash sort criteria */
-  stashSortCriteria: StashSortCriteria;
+**Presentation-Only State:**
 
-  /** Selected item in stash view */
-  selectedStashItem: EntityId | null;
+The following UI state is managed by the presentation layer (CLI or Agent Mode), not in GameState:
+- Selected item in stash view
+- Selected equipment slot
+- Selected chronicler submenu
+- Selected bestiary entry
 
-  /** Selected equipment slot */
-  selectedEquipmentSlot: EquipmentSlot | null;
-
-  /** Buyback inventory */
-  buybackItems: BuybackItem[];
-
-  /** Selected chronicler submenu */
-  chroniclerSection: ChroniclerSection | null;
-
-  /** Selected bestiary entry */
-  selectedBestiaryEntry: string | null;
-}
-
-type ChroniclerSection = 'bestiary' | 'lessons' | 'lore' | 'log';
-```
+These are ephemeral UI selections that don't need persistence or deterministic replay.
 
 ---
 
@@ -973,7 +893,6 @@ type ChroniclerSection = 'bestiary' | 'lessons' | 'lore' | 'log';
 | Unequip cursed item | Return `ITEM_CURSED` error |
 | Drop quest item | Block with warning "Quest items cannot be destroyed" |
 | Drop last weapon | Block - weapon slot cannot be empty |
-| Sort empty stash | No-op, return unchanged state |
 
 ### Equipment Operations
 
@@ -992,8 +911,6 @@ type ChroniclerSection = 'bestiary' | 'lessons' | 'lore' | 'log';
 | Purchase out-of-stock item | Return `INVALID_STATE` error |
 | Sell starting gear | Allow (not blocked) |
 | Sell quest item | Block with warning |
-| Buyback expired item | Item removed from buyback, return `ITEM_NOT_FOUND` |
-| Buyback with full stash | Return `INSUFFICIENT_STASH_SPACE` error |
 
 ### Expedition Preparation
 
@@ -1049,7 +966,6 @@ type ChroniclerSection = 'bestiary' | 'lessons' | 'lore' | 'log';
    - Equip item from stash
    - Unequip item to stash
    - Drop item from stash
-   - Sort stash by all criteria
    - Handle full stash
    - Handle empty stash
 
@@ -1065,7 +981,6 @@ type ChroniclerSection = 'bestiary' | 'lessons' | 'lore' | 'log';
    - Purchase consumable
    - Purchase accessory
    - Sell item
-   - Buyback item
    - Handle insufficient gold
    - Handle out of stock
    - Rotating stock refresh
@@ -1200,9 +1115,7 @@ property("level up always increases chosen stat by 1", (state, statChoice) => {
 5. **Merchant Full Cycle**
    - Sell item
    - Verify gold received
-   - Verify buyback available
    - Buy different item
-   - Buyback original item
    - Verify correct gold transactions
 
 ---
@@ -1323,34 +1236,6 @@ function processLessonLearnedAtStart(state: GameState): GameState {
 }
 ```
 
-### Stash Sorting
-
-```typescript
-const SORT_COMPARATORS: Record<StashSortCriteria, (a: StashItemView, b: StashItemView) => number> = {
-  rarity: (a, b) => RARITY_ORDER[b.rarity] - RARITY_ORDER[a.rarity],
-  slot: (a, b) => SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot],
-  name: (a, b) => a.name.localeCompare(b.name),
-  recent: (a, b) => b.acquiredAt - a.acquiredAt,
-  value: (a, b) => getSellValue(b) - getSellValue(a)
-};
-
-const RARITY_ORDER: Record<Rarity, number> = {
-  common: 0,
-  uncommon: 1,
-  rare: 2,
-  epic: 3,
-  legendary: 4
-};
-
-const SLOT_ORDER: Record<ItemSlot, number> = {
-  weapon: 0,
-  armor: 1,
-  helm: 2,
-  accessory: 3,
-  consumable: 4
-};
-```
-
 ---
 
 ## Public Exports
@@ -1370,7 +1255,6 @@ export type {
   CampDestination,
   StashView,
   StashItemView,
-  StashSortCriteria,
   EquipmentView,
   EquippedItemView,
   EquipmentSlotView,
@@ -1379,8 +1263,6 @@ export type {
   StatisticsView,
   MerchantView,
   MerchantItemView,
-  BuybackView,
-  BuybackItemView,
   BestiaryView,
   BestiaryCategoryView,
   BestiaryEntryView,
@@ -1411,7 +1293,6 @@ export type {
   BeginExpeditionResult,
   PurchaseResult,
   SellResult,
-  BuybackResult,
   LevelUpResult,
 };
 

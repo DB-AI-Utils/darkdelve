@@ -46,6 +46,37 @@ interface GameState {
 
   /** Current game phase */
   readonly phase: GamePhase;
+
+  /** Expedition prep workflow state (null except during expedition_prep/expedition_confirm phases) */
+  readonly expeditionPrep: ExpeditionPrepState | null;
+}
+
+// ==================== Expedition Prep State ====================
+
+/**
+ * Transient workflow state for expedition preparation.
+ * Created when entering expedition_prep phase, cleared when expedition begins or is cancelled.
+ */
+interface ExpeditionPrepState {
+  /** Items selected to bring from stash (max 2, at risk of loss on death) */
+  readonly selectedBringItems: readonly EntityId[];
+
+  /** Consumables selected for the expedition */
+  readonly selectedConsumables: readonly ConsumableSelection[];
+}
+
+interface ConsumableSelection {
+  /** Source of the consumable */
+  readonly source: 'stash' | 'merchant';
+
+  /** Item ID (if from stash) */
+  readonly itemId?: EntityId;
+
+  /** Template ID (if purchasing from merchant) */
+  readonly templateId?: string;
+
+  /** Quantity selected */
+  readonly quantity: number;
 }
 
 type GamePhase =
@@ -371,6 +402,15 @@ interface SessionState {
 
   /** Enemies killed this run */
   readonly enemiesKilledThisRun: number;
+
+  /** Floors explored this run (for run summary) */
+  readonly floorsExplored: number;
+
+  /** Items found this run (for run summary) */
+  readonly itemsFound: number;
+
+  /** Maximum Dread reached this run (for run summary) */
+  readonly maxDreadReached: number;
 
   /** Exploration turn counter (for Dread) */
   readonly explorationTurns: number;
@@ -1160,6 +1200,8 @@ export type {
   // Root state
   GameState,
   GamePhase,
+  ExpeditionPrepState,
+  ConsumableSelection,
 
   // Profile state
   ProfileState,

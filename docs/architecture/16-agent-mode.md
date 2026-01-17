@@ -649,7 +649,6 @@ interface AgentMerchantState {
   always_available: AgentMerchantItem[];
   rotating_stock: AgentMerchantItem[];
   can_sell: boolean;
-  has_buyback: boolean;
 }
 
 interface AgentMerchantItem {
@@ -1164,7 +1163,6 @@ Agent commands are simple string commands. The format is:
 |---------|---------|---------|
 | Buy item | `buy <template_id>` | `buy healing_potion` |
 | Sell item | `sell <item_id>` | `sell item_abc123` |
-| Buyback item | `buyback <item_id>` | `buyback item_xyz789` |
 
 ### Navigation Commands
 

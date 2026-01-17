@@ -19,6 +19,7 @@ Unified interface for all player actions. The command system validates commands 
 ## Dependencies
 
 - **01-foundation**: Types, Result
+- **02-content-registry**: ContentRegistry (command handlers query config and templates)
 - **03-state-management**: GameState, StateStore, StateAction
 - **04-event-system**: EventBus, GameEvent
 
@@ -323,11 +324,6 @@ interface MerchantSellCommand {
   itemId: EntityId;
 }
 
-interface MerchantBuybackCommand {
-  type: 'MERCHANT_BUYBACK';
-  itemId: EntityId;
-}
-
 // ==================== Chronicler Commands ====================
 
 interface ChroniclerIdentifyCommand {
@@ -544,7 +540,6 @@ type GameCommand =
   // Merchant
   | MerchantBuyCommand
   | MerchantSellCommand
-  | MerchantBuybackCommand
 
   // Chronicler
   | ChroniclerIdentifyCommand
@@ -640,7 +635,6 @@ const PHASE_COMMANDS: Record<GamePhase, GameCommand['type'][]> = {
   camp_merchant: [
     'MERCHANT_BUY',
     'MERCHANT_SELL',
-    'MERCHANT_BUYBACK',
     'CAMP_RETURN_TO_MAIN',
   ],
 

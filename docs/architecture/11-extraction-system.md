@@ -25,9 +25,11 @@ Manages the core gameplay loop of DARKDELVE: the extraction dilemma. This module
 
 - **01-foundation**: Types (`FloorNumber`, `EntityId`, `RoomType`), `Result`, `SeededRNG`
 - **02-content-registry**: `ExtractionConfig`
+- **03-state-management**: `SessionState`, `ProfileState` (reads run stats, gold, inventory)
 - **04-event-system**: Event emission (`EXTRACTION_*`, `ITEMS_LOST`, `LESSON_LEARNED_*`)
 - **07-item-system**: `ItemInstance`, `ItemSource`, `ItemRiskStatus`, inventory/stash operations
 - **09-dread-system**: Dread utility functions for extraction blocking (Watcher) and desperation Dread cost
+- **10-dungeon-system**: Floor/room context for extraction cost calculation and taunt generation
 
 > **Note:** Taunt generation requires `NextRoomContents` which the command handler builds by querying dungeon state and ContentRegistry. The extraction service does not directly depend on dungeon-system.
 
@@ -665,155 +667,20 @@ function createLessonLearnedService(
 
 ## Events Emitted
 
-### EXTRACTION_STARTED
+All event interfaces are defined in 04-event-system.md.
 
-Emitted when extraction begins.
-
-```typescript
-interface ExtractionStartedEvent {
-  type: 'EXTRACTION_STARTED';
-  timestamp: Timestamp;
-  floor: FloorNumber;
-  costType: 'free' | 'gold' | 'item' | 'desperation';
-  goldPaid?: number;
-  itemSacrificed?: string;
-  dreadCost?: number;
-}
-```
-
-### EXTRACTION_COMPLETED
-
-Emitted when extraction successfully completes.
-
-```typescript
-interface ExtractionCompletedEvent {
-  type: 'EXTRACTION_COMPLETED';
-  timestamp: Timestamp;
-  floor: FloorNumber;
-  itemsKept: number;
-  goldKept: number;
-  xpGained: number;
-  enemiesKilled: number;
-  lessonLearnedDecremented: boolean;
-}
-```
-
-### EXTRACTION_TAUNT
-
-Emitted to show what was missed.
-
-```typescript
-interface ExtractionTauntEvent {
-  type: 'EXTRACTION_TAUNT';
-  timestamp: Timestamp;
-  nextRoomType: RoomType;
-  contentHint: string;
-  chestType?: 'standard' | 'locked' | 'ornate';
-}
-```
-
-### THRESHOLD_RETREAT_STARTED
-
-Emitted when player begins retreat from Floor 5.
-
-```typescript
-interface ThresholdRetreatStartedEvent {
-  type: 'THRESHOLD_RETREAT_STARTED';
-  timestamp: Timestamp;
-  costType: 'gold' | 'item';
-  goldPaid?: number;
-  itemSacrificed?: string;
-}
-```
-
-### THRESHOLD_RETREAT_COMPLETED
-
-Emitted when retreat completes.
-
-```typescript
-interface ThresholdRetreatCompletedEvent {
-  type: 'THRESHOLD_RETREAT_COMPLETED';
-  timestamp: Timestamp;
-  returnFloor: FloorNumber;
-  goldRemaining: number;
-  floor5ProgressLost: boolean;
-}
-```
-
-### DEATH_OCCURRED
-
-Emitted when player dies.
-
-```typescript
-interface DeathOccurredEvent {
-  type: 'DEATH_OCCURRED';
-  timestamp: Timestamp;
-  killedBy: string;
-  killerType: EnemyType;
-  floor: FloorNumber;
-  dreadAtDeath: number;
-}
-```
-
-### ITEMS_LOST
-
-Emitted with details of lost items (all items in dungeon on death).
-
-```typescript
-interface ItemsLostEvent {
-  type: 'ITEMS_LOST';
-  timestamp: Timestamp;
-  items: Array<{
-    itemId: EntityId;
-    templateId: string;
-    itemName: string;
-  }>;
-  goldLost: number;
-}
-```
-
-### LESSON_LEARNED_GRANTED
-
-Emitted when Lesson Learned is gained.
-
-```typescript
-interface LessonLearnedGrantedEvent {
-  type: 'LESSON_LEARNED_GRANTED';
-  timestamp: Timestamp;
-  enemyType: string;
-  enemyName: string;
-  damageBonus: number;
-  runsRemaining: number;
-}
-```
-
-### LESSON_LEARNED_ACTIVATED
-
-Emitted at expedition start when Lesson Learned is active.
-
-```typescript
-interface LessonLearnedActivatedEvent {
-  type: 'LESSON_LEARNED_ACTIVATED';
-  timestamp: Timestamp;
-  enemyType: string;
-  enemyName: string;
-  damageBonus: number;
-  runsRemaining: number;
-}
-```
-
-### LESSON_LEARNED_EXPIRED
-
-Emitted when Lesson Learned charge is exhausted.
-
-```typescript
-interface LessonLearnedExpiredEvent {
-  type: 'LESSON_LEARNED_EXPIRED';
-  timestamp: Timestamp;
-  enemyType: string;
-  wasUsed: boolean;
-}
-```
+| Event | When Emitted |
+|-------|--------------|
+| `EXTRACTION_STARTED` | When extraction begins (includes payment details) |
+| `EXTRACTION_COMPLETED` | When extraction successfully completes |
+| `EXTRACTION_TAUNT` | After extraction, showing what was in next room |
+| `THRESHOLD_RETREAT_STARTED` | When player begins retreat from Floor 5 |
+| `THRESHOLD_RETREAT_COMPLETED` | When retreat completes, player returns to Floor 4 |
+| `DEATH_OCCURRED` | When player dies |
+| `ITEMS_LOST` | With details of all items lost on death |
+| `LESSON_LEARNED_GRANTED` | When Lesson Learned is gained after death |
+| `LESSON_LEARNED_ACTIVATED` | At expedition start when Lesson Learned is active |
+| `LESSON_LEARNED_EXPIRED` | When Lesson Learned charge is exhausted |
 
 ---
 
@@ -831,29 +698,37 @@ interface LessonLearnedExpiredEvent {
 
 ## State Managed
 
-This module operates on state managed by `03-state-management`:
+This module **reads** state from `03-state-management`, it does not define its own state.
+
+### SessionState Fields Used
+
+From `SessionState` (defined in 03-state-management.md):
+
+- `broughtItems: readonly EntityId[]` — Items brought from stash (at risk)
+- `goldCollected: number` — Gold collected this run
+- `xpCollected: number` — XP collected this run
+- `enemiesKilledThisRun: number` — Enemies killed this run
+- `floorsExplored: number` — Floors explored this run
+- `itemsFound: number` — Items found this run
+- `maxDreadReached: number` — Maximum Dread reached this run
+- `dungeon.currentFloor` — Current floor number
+- `dungeon.watcherActive` — Whether Watcher is active
+- `combat` — Current combat state (null if not in combat)
+
+### ProfileState Fields Used
+
+From `ProfileState` (defined in 03-state-management.md):
+
+- `lessonLearned: LessonLearnedState | null` — Active Lesson Learned bonus
+
+### Computed State
+
+`ExtractionState` is **computed on demand**, not stored:
 
 ```typescript
-// In SessionState
-interface SessionState {
-  /** Current extraction availability */
-  extractionState: ExtractionState;
-
-  /** Items brought from stash this run */
-  broughtItemIds: EntityId[];
-
-  /** Run statistics for extraction summary */
-  runStats: RunStats;
-}
-
 interface ExtractionState {
-  /** Whether extraction is currently available */
   available: boolean;
-
-  /** Why extraction is blocked (if blocked) */
   blockedReason: ExtractionBlockedReason | null;
-
-  /** Current extraction cost (cached) */
   currentCost: ExtractionCost | null;
 }
 
@@ -864,9 +739,14 @@ type ExtractionBlockedReason =
   | 'wrong_room_type'
   | 'floor_5_no_retreat';
 
-// Lesson Learned is stored in ProfileState (see 03-state-management.md)
-// Access via: state.profile.lessonLearned
+/**
+ * Compute extraction state from current game state.
+ * Called by extraction service methods, not stored.
+ */
+function computeExtractionState(session: SessionState): ExtractionState;
 ```
+
+This avoids stale state — extraction availability depends on floor, room type, combat state, and Watcher state, all of which change frequently.
 
 ---
 

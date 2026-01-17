@@ -134,6 +134,93 @@ Given the same inputs and RNG seed, the core produces identical outputs. This en
 
 ---
 
+## Core API Contract
+
+`GameSession` is the public facade of the game core. Presentation layers interact exclusively through this interface.
+
+### Interface
+
+```typescript
+interface GameSession {
+  /**
+   * Execute a game command.
+   * Returns result with new state snapshot and any emitted events.
+   */
+  executeCommand(command: GameCommand): CommandResult;
+
+  /**
+   * Get commands valid in current state.
+   * Each command includes enabled status and disable reason if applicable.
+   */
+  getAvailableCommands(): AvailableCommand[];
+
+  /**
+   * Get current game state (immutable snapshot).
+   */
+  getState(): GameState;
+
+  /**
+   * Get derived/computed state (effective stats, etc.).
+   */
+  getDerivedState(): DerivedState;
+
+  /**
+   * Subscribe to specific event type.
+   */
+  subscribe<T extends GameEvent['type']>(
+    eventType: T,
+    handler: (event: Extract<GameEvent, { type: T }>) => void
+  ): Unsubscribe;
+
+  /**
+   * Subscribe to all events.
+   */
+  subscribeAll(handler: (event: GameEvent) => void): Unsubscribe;
+}
+
+type Unsubscribe = () => void;
+
+/**
+ * Create a game session instance.
+ */
+function createGameSession(
+  contentRegistry: ContentRegistry,
+  options?: GameSessionOptions
+): GameSession;
+
+interface GameSessionOptions {
+  /** RNG seed for determinism (auto-generated if omitted) */
+  seed?: number;
+  /** Profile to load (creates new if not found) */
+  profileName?: string;
+  /** Path to profiles directory */
+  profilesPath?: string;
+}
+```
+
+### Ownership
+
+`GameSession` composes and coordinates:
+
+| Component | Module | Role |
+|-----------|--------|------|
+| `StateStore` | 03 | Holds immutable game state |
+| `EventBus` | 04 | Routes events to subscribers |
+| `CommandProcessor` | 05 | Validates and executes commands |
+
+Presentation layers never access these directly—only through `GameSession`.
+
+### Command Execution Flow
+
+1. Presentation calls `executeCommand(command)`
+2. `GameSession` delegates to `CommandProcessor`
+3. `CommandProcessor` validates command against current state
+4. If valid, state reducers produce new state
+5. `StateStore` updates, `EventBus` emits events
+6. `CommandResult` returned with success/failure, new state snapshot, emitted events
+
+---
+
 ## Implementation Order
 
 Modules must be implemented in dependency order. Each phase builds on the previous.
@@ -191,14 +278,14 @@ Modules must be implemented in dependency order. Each phase builds on the previo
 | 04-Event System | 01 |
 | 05-Command System | 01, 02, 03, 04 |
 | 06-Character | 01, 02, 03, 05 |
-| 07-Item | 01, 02, 03 |
+| 07-Item | 01, 02, 03, 04, 09 |
 | 08-Combat | 01, 02, 04, 06, 07 |
 | 09-Dread | 01, 02 |
 | 10-Dungeon | 01, 02, 03, 04, 08 |
-| 11-Extraction | 01, 02, 04, 07, 09, 10 |
+| 11-Extraction | 01, 02, 03, 04, 07, 09, 10 |
 | 12-Camp | 01, 02, 03, 04, 05, 06, 07 |
 | 13-Save | 01, 02, 03 |
-| 14-Analytics | 01, 03, 04 |
+| 14-Analytics | 01, 02, 03, 04 |
 | 15-CLI | All Core (01-13) |
 | 16-Agent Mode | All Core (01-13) |
 

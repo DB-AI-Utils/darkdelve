@@ -25,6 +25,8 @@ Manages all item-related operations: runtime item instances, inventory managemen
 - **01-foundation**: Types (EntityId, Rarity, EquipmentSlot, ItemSlot), Result, SeededRNG
 - **02-content-registry**: ItemTemplate, ConsumableData, ItemEffect, EffectType, LootTable
 - **03-state-management**: ItemInstance, ItemSource, InventoryState, EquipmentState, ConsumableSlotState, StashState
+- **04-event-system**: EventBus, GameEvent (item events: ITEM_FOUND, ITEM_EQUIPPED, etc.)
+- **09-dread-system**: Dread thresholds for loot quality bonus calculation (higher Dread = better loot chances)
 
 ---
 
@@ -733,18 +735,6 @@ interface MerchantService {
     currentGold: number
   ): Result<SellResult, GameError>;
 
-  /**
-   * Get buyback inventory
-   */
-  getBuybackInventory(): BuybackItem[];
-
-  /**
-   * Buyback recently sold item
-   */
-  buybackItem(
-    itemId: EntityId,
-    currentGold: number
-  ): Result<BuybackResult, GameError>;
 }
 
 interface MerchantStockParams {
@@ -777,21 +767,6 @@ interface PurchaseResult {
 interface SellResult {
   goldReceived: number;
   newGoldTotal: number;
-  addedToBuyback: boolean;
-}
-
-interface BuybackItem {
-  itemId: EntityId;
-  templateId: string;
-  displayName: string;
-  price: number;       // Original sell price + markup
-  expiresAt: Timestamp;
-}
-
-interface BuybackResult {
-  item: ItemInstance;
-  goldSpent: number;
-  remainingGold: number;
 }
 ```
 
@@ -815,18 +790,25 @@ interface BuybackResult {
 
 ### configs/merchant.json
 
+> **Note**: Full schema defined in 02-content-registry.md. Item-relevant subset shown here.
+
 ```json
 {
-  "rotatingSlotCount": 4,
+  "alwaysAvailable": [
+    { "templateId": "healing_potion", "price": 15 },
+    { "templateId": "antidote", "price": 12 }
+  ],
+  "rotatingStock": {
+    "consumableSlots": 2,
+    "rotatingConsumables": ["id_scroll", "smoke_bomb", "fire_flask"]
+  },
   "accessorySlotsByLevel": [
     { "minLevel": 1, "slots": 1, "rarities": ["common", "uncommon"] },
     { "minLevel": 5, "slots": 2, "rarities": ["common", "uncommon", "rare"] },
     { "minLevel": 10, "slots": 3, "rarities": ["uncommon", "rare", "epic"] }
   ],
-  "buybackMarkup": 1.25,
-  "sellRatio": 0.5,
-  "unidentifiedSellRatio": 0.5,
-  "buybackLimit": 5,
+  "sellValueMultiplier": 0.5,
+  "unidentifiedSellMultiplier": 0.25,
   "stockSeedComponents": ["runNumber", "characterLevel", "lastExtractionFloor"]
 }
 ```
@@ -1091,7 +1073,7 @@ property("loot rarity matches floor distribution", (floor, samples) => {
    - Bring items -> Die -> Verify all items lost, stash unchanged
 
 4. **Merchant Flow**
-   - Buy item -> Sell item -> Buyback item
+   - Buy item -> Sell item (sold items are gone permanently)
 
 5. **Consumable Flow**
    - Find consumable -> Stack -> Use in combat -> Verify effect
@@ -1102,43 +1084,9 @@ property("loot rarity matches floor distribution", (floor, samples) => {
 
 ### Dread Display Corruption
 
-Item stats are corrupted for display based on Dread level:
+**NOT handled by Item System.** Dread-based stat corruption is a presentation concern owned by CLI Presentation (15-cli-presentation.md). The `ItemRenderer.renderCard()` function applies corruption using `corruptNumericValue` from Dread module (09) with presentation RNG.
 
-```typescript
-function corruptStatDisplay(
-  actualValue: number,
-  currentDread: number,
-  rng: SeededRNG
-): string {
-  if (currentDread < 50) {
-    return String(actualValue);
-  }
-
-  if (currentDread < 70) {
-    // Uneasy: Show as range (+/- 20%)
-    const variance = Math.floor(actualValue * 0.2);
-    return `${actualValue - variance}-${actualValue + variance}`;
-  }
-
-  if (currentDread < 85) {
-    // Shaken: 15% chance of wrong value (+/- 30%)
-    if (rng.chance(0.15)) {
-      const variance = Math.floor(actualValue * 0.3);
-      const corrupted = actualValue + rng.randomInt(-variance, variance);
-      return String(corrupted);
-    }
-    return String(actualValue);
-  }
-
-  // Terrified: 25% chance of "???"
-  if (rng.chance(0.25)) {
-    return '???';
-  }
-  return String(actualValue);
-}
-```
-
-**Critical Rule:** Only DISPLAY is corrupted. Underlying values are unchanged.
+Item System provides raw, uncorrupted stat values. Presentation layer decides how to display them.
 
 ### Effect Stacking
 
@@ -1260,8 +1208,6 @@ export type {
   MerchantItem,
   PurchaseResult,
   SellResult,
-  BuybackItem,
-  BuybackResult,
 };
 
 export {

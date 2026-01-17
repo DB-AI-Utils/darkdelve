@@ -724,9 +724,23 @@ interface BacktrackOption {
 
 // === Item Display ===
 
+/**
+ * Item rendering with Dread-based stat corruption.
+ *
+ * IMPORTANT: Item stat corruption is a presentation concern, NOT core logic.
+ * ItemService provides raw, uncorrupted values via ResolvedItem.
+ * This renderer applies corruption using Dread module's corruptNumericValue()
+ * with presentation RNG to ensure:
+ * - Visual effects don't affect gameplay determinism
+ * - Same game state produces consistent corruption per frame
+ * - Core item stats remain unchanged
+ *
+ * Stats to corrupt: baseStats.damageMin/Max, armor, vigor, might, cunning
+ */
 interface ItemRenderer {
   /**
    * Render item card (detailed view)
+   * Applies Dread corruption to stat displays
    */
   renderCard(
     item: ResolvedItem,

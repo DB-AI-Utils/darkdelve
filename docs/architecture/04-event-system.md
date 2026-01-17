@@ -373,7 +373,6 @@ interface ItemPurchasedEvent {
   templateId: string;
   itemName: string;
   goldSpent: number;
-  fromBuyback: boolean;
 }
 
 interface StashItemAddedEvent {
@@ -516,6 +515,15 @@ interface BestiaryEntryUnlockedEvent {
   firstEncounter: boolean;
 }
 
+interface LessonLearnedGrantedEvent {
+  type: 'LESSON_LEARNED_GRANTED';
+  timestamp: Timestamp;
+  enemyType: string;
+  enemyName: string;
+  damageBonus: number;
+  runsRemaining: number;
+}
+
 interface LessonLearnedActivatedEvent {
   type: 'LESSON_LEARNED_ACTIVATED';
   timestamp: Timestamp;
@@ -563,6 +571,22 @@ interface ExtractionTauntEvent {
   chestType?: 'standard' | 'locked' | 'ornate';
 }
 
+interface ThresholdRetreatStartedEvent {
+  type: 'THRESHOLD_RETREAT_STARTED';
+  timestamp: Timestamp;
+  costType: 'gold' | 'item';
+  goldPaid?: number;
+  itemSacrificed?: string;
+}
+
+interface ThresholdRetreatCompletedEvent {
+  type: 'THRESHOLD_RETREAT_COMPLETED';
+  timestamp: Timestamp;
+  returnFloor: FloorNumber;
+  goldRemaining: number;
+  floor5ProgressLost: boolean;
+}
+
 // ==================== Death Events ====================
 
 interface DeathOccurredEvent {
@@ -574,8 +598,8 @@ interface DeathOccurredEvent {
   dreadAtDeath: number;
 }
 
-// Full loss on death: all items in dungeon are lost equally.
-// No reason needed - matches LostItemInfo from Item System (07).
+// Full loss on death: all items and gold in dungeon are lost.
+// Matches LostItemInfo from Item System (07).
 interface ItemsLostEvent {
   type: 'ITEMS_LOST';
   timestamp: Timestamp;
@@ -584,6 +608,7 @@ interface ItemsLostEvent {
     templateId: string;
     itemName: string;
   }>;
+  goldLost: number;
 }
 
 // NOTE: ItemsPreservedEvent removed. With full loss on death, no items
@@ -775,6 +800,7 @@ type GameEvent =
   // Knowledge
   | VeteranKnowledgeUnlockedEvent
   | BestiaryEntryUnlockedEvent
+  | LessonLearnedGrantedEvent
   | LessonLearnedActivatedEvent
   | LessonLearnedExpiredEvent
 
@@ -782,6 +808,8 @@ type GameEvent =
   | ExtractionStartedEvent
   | ExtractionCompletedEvent
   | ExtractionTauntEvent
+  | ThresholdRetreatStartedEvent
+  | ThresholdRetreatCompletedEvent
 
   // Death
   | DeathOccurredEvent
@@ -1011,11 +1039,14 @@ export type {
   ExtractionUnblockedEvent,
   VeteranKnowledgeUnlockedEvent,
   BestiaryEntryUnlockedEvent,
+  LessonLearnedGrantedEvent,
   LessonLearnedActivatedEvent,
   LessonLearnedExpiredEvent,
   ExtractionStartedEvent,
   ExtractionCompletedEvent,
   ExtractionTauntEvent,
+  ThresholdRetreatStartedEvent,
+  ThresholdRetreatCompletedEvent,
   DeathOccurredEvent,
   ItemsLostEvent,
   EventStartedEvent,
