@@ -22,6 +22,7 @@ Handles all persistence operations for DARKDELVE: profile management, game state
 ## Dependencies
 
 - **01-foundation**: Types, Result, FileSystem, Timestamp, Logger
+- **02-content-registry**: GameConfig (for `defaultProfileName`)
 - **03-state-management**: GameState, ProfileState, serializeState, deserializeState
 
 ---
@@ -39,7 +40,7 @@ Handles all persistence operations for DARKDELVE: profile management, game state
  * **Identifier Convention**: All `profileName` parameters refer to
  * `ProfileState.name`, which is both the display name AND the filesystem
  * directory name. Names must be filesystem-safe (alphanumeric, dash,
- * underscore) and are validated against `profileNameRules` config.
+ * underscore) and are validated against profile name validation constants.
  *
  * Directory structure: profiles/{profileName}/
  */
@@ -61,8 +62,8 @@ interface ProfileManager {
    * state-management utilities. This keeps profile/character construction
    * logic in state layer and persistence logic in save layer.
    *
-   * Validates profile.name against profileNameRules before creating directory.
-   * Returns INVALID_PROFILE_NAME error if validation fails.
+   * Validates profile.name against profile name validation constants before
+   * creating directory. Returns INVALID_PROFILE_NAME error if validation fails.
    *
    * @param profile - Pre-constructed ProfileState from state utilities
    */
@@ -82,9 +83,9 @@ interface ProfileManager {
 
   /**
    * Rename a profile. Renames both the directory and updates ProfileState.name.
-   * Validates newName against profileNameRules before renaming.
+   * Validates newName against profile name validation constants before renaming.
    * @param oldName - Current ProfileState.name (directory name)
-   * @param newName - New name (must pass profileNameRules validation)
+   * @param newName - New name (must pass profile name validation)
    */
   renameProfile(
     oldName: string,
@@ -299,11 +300,6 @@ interface StashManager {
    * Save stash for active profile
    */
   saveStash(stash: StashState): Promise<Result<void, SaveError>>;
-
-  /**
-   * Get stash capacity from profile
-   */
-  getCapacity(): number;
 }
 
 function createStashManager(
@@ -474,9 +470,6 @@ interface StashFile {
   /** Last modified timestamp */
   modifiedAt: Timestamp;
 
-  /** Stash capacity */
-  capacity: number;
-
   /** Items in stash */
   items: StashedItemSaveData[];
 }
@@ -584,60 +577,26 @@ interface Migration {
 
 ---
 
-## Configuration Files
+## Configuration
 
-### configs/save.json
+The save system uses **internal constants** for implementation details (file names, suffixes, algorithms). These are not externalized to config files because they are engineering decisions, not game design parameters.
 
-```json
-{
-  "profilesDirectory": "profiles",
-  "defaultProfileName": "default",
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `PROFILES_DIR` | `"profiles"` | Directory for profile data |
+| `PROFILE_FILENAME` | `"profile.json"` | Profile metadata file |
+| `SAVE_FILENAME` | `"save.json"` | Main save file |
+| `STASH_FILENAME` | `"stash.json"` | Stash data file |
+| `TEMP_SUFFIX` | `".tmp"` | Temp file during atomic write |
+| `BACKUP_SUFFIX` | `".bak"` | Backup file during atomic write |
+| `MAX_BACKUPS` | `5` | Backup retention count |
+| `CHECKSUM_ALGORITHM` | `"sha256"` | Integrity verification |
+| `PROFILE_NAME_MIN_LENGTH` | `1` | Minimum profile name length |
+| `PROFILE_NAME_MAX_LENGTH` | `32` | Maximum profile name length |
+| `PROFILE_NAME_PATTERN` | `/^[a-zA-Z0-9_-]+$/` | Allowed characters (filesystem-safe) |
+| `RESERVED_PROFILE_NAMES` | `["default", "system", "temp", "backup"]` | Names that cannot be used |
 
-  "saveFiles": {
-    "profile": "profile.json",
-    "save": "save.json",
-    "stash": "stash.json",
-    "analyticsDir": "analytics"
-  },
-
-  "atomicWrite": {
-    "tempSuffix": ".tmp",
-    "backupSuffix": ".bak",
-    "verifyAfterWrite": true,
-    "keepBackupOnSuccess": false
-  },
-
-  "stash": {
-    "defaultCapacity": 12,
-    "maxCapacity": 20
-  },
-
-  "backups": {
-    "maxBackups": 5,
-    "autoBackupOnExtraction": true,
-    "backupDirectory": "backups"
-  },
-
-  "validation": {
-    "checksumAlgorithm": "sha256",
-    "validateOnLoad": true,
-    "strictSchemaValidation": true
-  },
-
-  "recovery": {
-    "attemptAutoRecovery": true,
-    "useBackupOnCorruption": true,
-    "logRecoveryAttempts": true
-  },
-
-  "profileNameRules": {
-    "minLength": 1,
-    "maxLength": 32,
-    "allowedCharacters": "alphanumeric_dash_underscore",
-    "reservedNames": ["default", "backup", "temp", "system"]
-  }
-}
-```
+**External configuration:** `defaultProfileName` comes from `GameConfig` via ContentRegistry, since it's a player-facing game setting.
 
 ---
 
@@ -877,7 +836,7 @@ property("profile names are filesystem safe", (name: string) => {
 
 ```
 profiles/
-├── default/
+├── adventurer/
 │   ├── profile.json     # Metadata, last played, player type
 │   ├── save.json        # Character, equipment, progression
 │   ├── stash.json       # Stored items (separate for faster access)
@@ -1002,12 +961,13 @@ function setupSaveTriggers(
 On first launch, ensure a default profile exists. The orchestration follows
 the standard pattern:
 
-1. Check existence via `profileExists('default')`
-2. If missing, construct ProfileState via `createProfileState()` from state utilities (03)
-3. Persist via `createProfile(profile)`
+1. Get default name via `ContentRegistry.getGameConfig().defaultProfileName`
+2. Check existence via `profileExists(defaultName)`
+3. If missing, construct ProfileState via `createProfileState()` from state utilities (03)
+4. Persist via `createProfile(profile)`
 
 **Key boundary:** ProfileManager receives pre-constructed ProfileState. It does not
-know about character classes or ContentRegistry - that knowledge stays in state utilities.
+know about character classes - that knowledge stays in state utilities.
 
 ---
 

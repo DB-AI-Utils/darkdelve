@@ -24,7 +24,7 @@ Turn-based combat resolution engine. Processes combat actions, calculates damage
 
 - **01-foundation**: Types (EntityId, EnemySpeed, EnemyType), Result, SeededRNG, NumericRange
 - **02-content-registry**: MonsterTemplate, MonsterAbility, StatusEffectTemplate, CombatConfig
-- **03-state-management**: CombatState, TurnPhase, TurnOrder, PlayerCombatState, EnemyCombatState, CombatActionType, CombatAction
+- **03-state-management**: CombatState, TurnPhase, TurnOrder, PlayerCombatState, EnemyCombatState, CombatActionType, CombatAction, CombatActionEffects
 - **04-event-system**: EventBus, combat events (CombatStartedEvent, PlayerAttackedEvent, etc.)
 - **06-character-system**: Character stats, equipped weapon damage, computed values
 - **07-item-system**: Item effects, consumable usage in combat
@@ -567,6 +567,13 @@ interface CombatInitResult {
   ambushActionsTaken: number;
 }
 
+/**
+ * Result of executing a player combat action via CombatEngine.
+ *
+ * Note: The `effects` field uses `CombatActionEffects` from 03-state-management,
+ * which is the canonical type for combat action effects. This ensures the
+ * engine result can be directly used when dispatching COMBAT_ACTION_EXECUTED.
+ */
 interface CombatActionResult {
   /** Whether action executed successfully */
   success: boolean;
@@ -583,7 +590,10 @@ interface CombatActionResult {
   /** Combat outcome if ended */
   outcome?: CombatOutcome;
 
-  /** Action-specific result data */
+  /** Action effects (imported from 03-state-management) */
+  effects: CombatActionEffects;
+
+  /** Additional action-specific data */
   data: CombatActionData;
 }
 

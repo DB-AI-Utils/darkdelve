@@ -32,7 +32,7 @@ Provides a structured JSON interface for AI agents (such as Claude Code) to play
 - **06-character-system**: CharacterService for stat calculations
 - **07-item-system**: ItemService for item info
 - **08-combat-system**: CombatState, EnemyCombatState
-- **09-dread-system**: DreadManager for corruption
+- **09-dread-system**: Corruption pure functions for JSON value corruption
 - **10-dungeon-system**: DungeonState, RoomInstanceState
 - **11-extraction-system**: ExtractionService for cost calculations
 - **12-camp-system**: CampService, ExpeditionService views
@@ -158,7 +158,6 @@ type AgentSubsystem =
  */
 function createAgentModeAdapter(
   gameSession: GameSession,
-  dreadManager: DreadManager,
   contentRegistry: ContentRegistry,
   profileManager: ProfileManager,
   eventBus: EventBus

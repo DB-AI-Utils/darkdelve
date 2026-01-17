@@ -8,17 +8,25 @@ This is **not** a damage system - it's an **information corruption** system. The
 
 ---
 
+## Architecture Approach
+
+**This module has no stateful service.** All Dread-related state lives in `StateStore` (see 03-state-management.md). This module provides:
+
+1. **Pure utility functions** for calculations (corruption, thresholds, Watcher checks)
+2. **Type definitions** for Dread-related data
+3. **Configuration schema** for tuning Dread behavior
+
+State mutations happen via `StateAction` dispatches from command handlers or event processors.
+
+---
+
 ## Responsibilities
 
-1. Track and modify Dread value (0-100)
-2. Calculate Dread changes from all sources (combat, exploration, events, items)
-3. Apply Dread modifiers (torch effect only for MVP)
-4. Determine current Dread threshold
-5. Generate perception corruption based on threshold
-6. Emit threshold crossing events
-7. Manage Watcher spawn, pursuit, and combat mechanics
-8. Block/unblock extraction based on Watcher state
-9. Provide corruption filters for presentation layer queries
+1. Provide threshold calculation functions
+2. Provide corruption/hallucination functions for presentation layer
+3. Provide Watcher stun/escape calculations
+4. Define Dread-related types and configuration schema
+5. Document Dread gain/loss rules for command handlers to implement
 
 ---
 
@@ -26,160 +34,231 @@ This is **not** a damage system - it's an **information corruption** system. The
 
 - **01-foundation**: Types (`DreadThreshold`, `EnemyType`, `FloorNumber`), `SeededRNG`, `Result`, `clamp`
 - **02-content-registry**: `DreadConfig`, `DreadThresholdConfig`, config accessors
-- **04-event-system**: Event emission (`DREAD_CHANGED`, `DREAD_THRESHOLD_CROSSED`, `WATCHER_*`)
+
+**Note:** This module does NOT depend on event-system or state-management. It provides pure functions that other modules call.
+
+---
+
+## State Ownership
+
+All Dread-related state lives in `StateStore`:
+
+```typescript
+// In SessionState
+interface SessionState {
+  explorationTurns: number;    // Counts toward passive Dread gain
+  torchActive: boolean;        // Reduces Dread gain while true
+  torchActivatedFloor: FloorNumber | null;  // Floor where torch was lit
+}
+
+// In SessionPlayerState
+interface SessionPlayerState {
+  currentDread: number;        // 0-100, the core Dread value
+}
+
+// In DungeonState
+interface DungeonState {
+  watcherActive: boolean;      // Whether The Watcher has spawned
+  watcherCombat: WatcherCombatState | null;  // Watcher fight state
+}
+```
+
+**There is no DreadManager service.** Command handlers read state, call pure functions, and dispatch state actions.
 
 ---
 
 ## Interface Contracts
 
-### Dread Manager
+### Pure Calculation Functions
 
 ```typescript
-// ==================== Main Interface ====================
+// ==================== Threshold Functions ====================
 
-interface DreadManager {
-  // === Dread Value Operations ===
+/**
+ * Get the threshold for a given Dread value
+ */
+function getThresholdForDread(dread: number): DreadThreshold;
 
-  /**
-   * Get current Dread value
-   */
-  getCurrentDread(): number;
+/**
+ * Get configuration for a threshold
+ */
+function getThresholdConfig(
+  threshold: DreadThreshold,
+  config: DreadConfig
+): DreadThresholdConfig;
 
-  /**
-   * Get current Dread threshold
-   */
-  getCurrentThreshold(): DreadThreshold;
+/**
+ * Check if Dread is at or above a specific threshold
+ */
+function isAtThreshold(dread: number, threshold: DreadThreshold): boolean;
 
-  /**
-   * Apply Dread change from a source
-   * Handles torch modifier automatically
-   * Returns the actual change after modifiers
-   */
-  applyDreadChange(change: DreadChangeRequest): DreadChangeResult;
+/**
+ * Get distance to next/previous threshold
+ */
+function getThresholdDistance(dread: number): ThresholdDistance;
 
-  /**
-   * Calculate what Dread change would be after modifiers (without applying)
-   */
-  previewDreadChange(change: DreadChangeRequest): number;
+// ==================== Dread Change Functions ====================
 
-  // === Threshold Queries ===
+/**
+ * Calculate Dread change after applying modifiers
+ * Returns the actual delta to apply (may differ from requested due to torch, etc.)
+ */
+function calculateDreadChange(
+  request: DreadChangeRequest,
+  currentState: { torchActive: boolean },
+  config: DreadConfig
+): DreadChangeCalculation;
 
-  /**
-   * Get configuration for a threshold
-   */
-  getThresholdConfig(threshold: DreadThreshold): DreadThresholdConfig;
+/**
+ * Check if a Dread change would trigger Watcher spawn
+ */
+function wouldTriggerWatcher(
+  currentDread: number,
+  delta: number,
+  watcherActive: boolean
+): boolean;
 
-  /**
-   * Check if Dread is at or above a specific threshold
-   */
-  isAtThreshold(threshold: DreadThreshold): boolean;
+// ==================== Corruption Functions ====================
+//
+// IMPORTANT: All corruption functions accept an RNG parameter for randomization.
+// When called from the presentation layer, this MUST be a PresentationRNG
+// (derived from game state), NOT the gameplay RNG. This ensures:
+// - Rendering never affects gameplay determinism
+// - Same game state produces consistent visual corruption
+// See 15-cli-presentation.md for PresentationRNG creation.
 
-  /**
-   * Get distance to next threshold (positive) or from previous (negative)
-   */
-  getThresholdDistance(): ThresholdDistance;
+/**
+ * Get hallucination chance for current Dread level
+ */
+function getHallucinationChance(dread: number, config: DreadConfig): number;
 
-  // === Perception Corruption ===
+/**
+ * Roll for hallucination based on current Dread
+ * NOTE: Rendering code must pass an isolated SeededRNG instance (see createPresentationRNG)
+ */
+function shouldHallucinate(dread: number, config: DreadConfig, rng: SeededRNG): boolean;
 
-  /**
-   * Get current hallucination chance (0-1)
-   */
-  getHallucinationChance(): number;
+/**
+ * Apply corruption to a numeric value
+ * Returns original, corrupted display, or "???" based on threshold
+ * NOTE: Rendering code must pass an isolated SeededRNG instance (see createPresentationRNG)
+ */
+function corruptNumericValue(
+  value: number,
+  dread: number,
+  context: CorruptionContext,
+  config: DreadConfig,
+  rng: SeededRNG
+): CorruptedValue<number>;
 
-  /**
-   * Roll for hallucination based on current Dread
-   */
-  shouldHallucinate(rng: SeededRNG): boolean;
+/**
+ * Apply corruption to a string value (e.g., enemy name)
+ * NOTE: Rendering code must pass an isolated SeededRNG instance (see createPresentationRNG)
+ */
+function corruptStringValue(
+  value: string,
+  alternatives: readonly string[],
+  dread: number,
+  context: CorruptionContext,
+  config: DreadConfig,
+  rng: SeededRNG
+): CorruptedValue<string>;
 
-  /**
-   * Apply corruption to a numeric value
-   * Returns original, corrupted display, or "???" based on threshold
-   */
-  corruptNumericValue(
-    value: number,
-    context: CorruptionContext,
-    rng: SeededRNG
-  ): CorruptedValue<number>;
+/**
+ * Apply corruption to room type preview
+ * NOTE: Rendering code must pass an isolated SeededRNG instance (see createPresentationRNG)
+ */
+function corruptRoomType(
+  roomType: RoomType,
+  dread: number,
+  config: DreadConfig,
+  rng: SeededRNG
+): CorruptedValue<RoomType | 'unknown'>;
 
-  /**
-   * Apply corruption to a string value (e.g., enemy name)
-   */
-  corruptStringValue(
-    value: string,
-    alternatives: readonly string[],
-    context: CorruptionContext,
-    rng: SeededRNG
-  ): CorruptedValue<string>;
+/**
+ * Generate whisper message for combat log
+ * Returns null if no whisper should appear
+ * NOTE: Rendering code must pass an isolated SeededRNG instance (see createPresentationRNG)
+ */
+function generateWhisper(
+  dread: number,
+  context: WhisperContext,
+  config: DreadConfig,
+  rng: SeededRNG
+): string | null;
 
-  /**
-   * Apply corruption to room type preview
-   */
-  corruptRoomType(
-    roomType: RoomType,
-    rng: SeededRNG
-  ): CorruptedValue<RoomType | 'unknown'>;
+// ==================== Watcher Functions ====================
 
-  /**
-   * Generate whisper message for combat log
-   * Returns null if no whisper should appear
-   */
-  generateWhisper(context: WhisperContext, rng: SeededRNG): string | null;
+/**
+ * Check if The Watcher should spawn (Dread reached 100)
+ */
+function shouldSpawnWatcher(
+  currentDread: number,
+  watcherActive: boolean,
+  inBossFight: boolean
+): WatcherSpawnCheck;
 
-  // === Watcher Management ===
+/**
+ * Calculate Watcher stun result from damage dealt
+ */
+function calculateWatcherStun(
+  damageDealt: number,
+  watcherState: WatcherCombatState,
+  config: DreadConfig
+): WatcherStunResult;
 
-  /**
-   * Check if The Watcher should spawn
-   */
-  shouldSpawnWatcher(): boolean;
+/**
+ * Calculate Watcher damage to player
+ */
+function calculateWatcherDamage(
+  watcherState: WatcherCombatState,
+  playerBlocking: boolean,
+  playerArmor: number,
+  config: DreadConfig
+): number;
 
-  /**
-   * Check if The Watcher is currently active
-   */
-  isWatcherActive(): boolean;
+/**
+ * Check if extraction is blocked by Watcher
+ */
+function isExtractionBlockedByWatcher(watcherState: WatcherCombatState | null): boolean;
 
-  /**
-   * Get Watcher combat state (null if not active)
-   */
-  getWatcherState(): WatcherState | null;
+// ==================== Dread Source Calculations ====================
 
-  /**
-   * Process Watcher stun from damage dealt
-   * Returns whether stun was successful
-   */
-  processWatcherStun(damageDealt: number): WatcherStunResult;
+/**
+ * Get Dread gain for killing an enemy
+ */
+function getDreadGainForKill(enemyType: EnemyType, config: DreadConfig): number;
 
-  /**
-   * Check if extraction is blocked by The Watcher
-   */
-  isExtractionBlocked(): boolean;
+/**
+ * Get Dread gain for exploration turns
+ * Returns gain amount if threshold reached, 0 otherwise
+ */
+function getDreadGainForExploration(
+  explorationTurns: number,
+  config: DreadConfig
+): number;
 
-  /**
-   * Get turns remaining in escape window (0 if not stunned)
-   */
-  getEscapeWindowTurns(): number;
+/**
+ * Get Dread gain for floor descent
+ */
+function getDreadGainForDescent(
+  fromFloor: FloorNumber,
+  toFloor: FloorNumber,
+  config: DreadConfig
+): number;
 
-  // === Modifiers ===
+/**
+ * Get Dread recovery for rest
+ */
+function getDreadRecoveryForRest(config: DreadConfig): number;
 
-  /**
-   * Get total Dread gain reduction from active effects
-   */
-  getDreadGainReduction(): number;
-
-  /**
-   * Check if torch is active
-   */
-  isTorchActive(): boolean;
-
-  /**
-   * Activate torch effect (reduces Dread gain)
-   */
-  activateTorch(): void;
-
-  /**
-   * Deactivate torch (on floor change)
-   */
-  deactivateTorch(): void;
-}
+/**
+ * Get Dread recovery for consumable
+ */
+function getDreadRecoveryForConsumable(
+  consumableId: string,
+  config: DreadConfig
+): number;
 ```
 
 ### Types
@@ -194,131 +273,78 @@ interface DreadChangeRequest {
   /** Source of the Dread change */
   source: DreadSource;
 
-  /** Whether this change can be modified (default true) */
+  /** Whether this change can be modified by torch (default true) */
   modifiable?: boolean;
-
-  /** Floor where change occurred (for analytics) */
-  floor?: FloorNumber;
 }
 
 type DreadSource =
   // Combat sources
-  | { type: 'kill_enemy'; enemyType: EnemyType; enemyId: string }
+  | { type: 'kill_enemy'; enemyType: EnemyType }
 
   // Exploration sources
-  | { type: 'exploration_turns'; turnCount: number }
-  | { type: 'floor_descent'; fromFloor: FloorNumber; toFloor: FloorNumber }
-  | { type: 'darkness'; turnsInDarkness: number }
+  | { type: 'exploration_turns' }
+  | { type: 'floor_descent' }
 
   // Event sources
-  | { type: 'forbidden_text'; eventId: string }
-  | { type: 'horror_encounter'; eventId: string }
-  | { type: 'flee_attempt'; success: boolean }
+  | { type: 'forbidden_text' }
+  | { type: 'horror_encounter' }
+  | { type: 'flee_attempt' }
 
   // Recovery sources
-  | { type: 'rest'; restType: 'camp' | 'dungeon' }
-  | { type: 'shrine_blessing'; shrineId: string }
-  | { type: 'consumable'; itemId: string; itemName: string }
+  | { type: 'rest' }
+  | { type: 'shrine_blessing' }
+  | { type: 'consumable'; consumableId: string }
 
   // Special
   | { type: 'watcher_presence' }
   | { type: 'debug_override' };
 
-interface DreadChangeResult {
+interface DreadChangeCalculation {
   /** Original requested amount */
   requestedAmount: number;
 
   /** Actual amount after modifiers */
   actualAmount: number;
 
-  /** Previous Dread value */
-  previousDread: number;
-
-  /** New Dread value */
-  newDread: number;
-
-  /** Whether threshold was crossed */
-  thresholdCrossed: boolean;
-
-  /** Previous threshold (if crossed) */
-  previousThreshold?: DreadThreshold;
-
-  /** New threshold (if crossed) */
-  newThreshold?: DreadThreshold;
-
-  /** Modifiers that affected the change */
-  modifiersApplied: DreadModifier[];
-
-  /** Whether Watcher should spawn */
-  triggerWatcherSpawn: boolean;
-}
-
-interface DreadModifier {
-  source: 'torch' | 'blessing' | 'class_passive';
-  reduction: number;
+  /** Whether torch modifier was applied */
+  torchApplied: boolean;
 }
 
 interface ThresholdDistance {
-  /** Current threshold */
   current: DreadThreshold;
-
-  /** Dread needed to reach next higher threshold (null if at max) */
   toNextUp: number | null;
-
-  /** Dread lost to return to previous threshold (null if at min) */
   toNextDown: number | null;
 }
 
 // ==================== Corruption Types ====================
 
 interface CorruptionContext {
-  /** Type of value being corrupted */
   valueType: 'hp' | 'damage' | 'count' | 'stat' | 'name' | 'room_type';
-
-  /** Whether player has Veteran Knowledge for this enemy */
   hasVeteranKnowledge?: boolean;
-
-  /** Veteran Knowledge tier (1-3) if applicable */
   veteranTier?: 1 | 2 | 3;
-
-  /** Current combat context */
   inCombat?: boolean;
 }
 
 interface CorruptedValue<T> {
-  /** Original true value */
   actual: T;
-
-  /** Display value (may be corrupted) */
   display: T | NumericRange | '???';
-
-  /** Whether value was corrupted */
   wasCorrupted: boolean;
-
-  /** Type of corruption applied */
   corruptionType: CorruptionType | null;
-
-  /** Veteran Knowledge override (shown in brackets) */
   veteranOverride?: T;
 }
 
 type CorruptionType =
-  | 'blur'           // Show as range instead of exact
-  | 'variance'       // Add random variance to number
-  | 'hallucination'  // Show completely wrong value
-  | 'unknown'        // Show as "???"
-  | 'false_name';    // Show wrong name for enemy/item
+  | 'blur'
+  | 'variance'
+  | 'hallucination'
+  | 'unknown'
+  | 'false_name';
 
 // ==================== Whisper Types ====================
 
 interface WhisperContext {
-  /** Current game phase */
   phase: 'exploration' | 'combat' | 'event';
-
-  /** Recent events that might trigger whispers */
   recentEvents: readonly WhisperTrigger[];
-
-  /** Turn number in combat (if applicable) */
   combatTurn?: number;
 }
 
@@ -332,70 +358,26 @@ type WhisperTrigger =
 
 // ==================== Watcher Types ====================
 
-interface WatcherState {
-  /** Whether Watcher is currently active */
-  active: boolean;
-
-  /** Watcher HP (effectively infinite but tracked for display) */
-  currentHP: number;
-
-  /** Number of times Watcher has been stunned this run */
-  stunCount: number;
-
-  /** Whether Watcher is currently stunned */
-  isStunned: boolean;
-
-  /** Turns remaining in stun */
-  stunTurnsRemaining: number;
-
-  /** Whether Watcher is enraged (after 2 stuns) */
-  isEnraged: boolean;
-
-  /** Whether Watcher is immune to stuns (after 3 attempts) */
-  isImmune: boolean;
-
-  /** Whether extraction is currently blocked */
-  extractionBlocked: boolean;
-
-  /** Spawn was deferred (during boss fight) */
-  spawnDeferred: boolean;
+interface WatcherSpawnCheck {
+  shouldSpawn: boolean;
+  deferred: boolean;  // True if in boss fight
+  reason: 'dread_max' | 'already_active' | 'below_threshold' | 'deferred_boss';
 }
 
 interface WatcherStunResult {
-  /** Whether the stun attempt succeeded */
   success: boolean;
-
-  /** Damage dealt to Watcher */
   damageDealt: number;
-
-  /** Damage threshold needed */
   thresholdNeeded: number;
-
-  /** Whether stun was blocked by immunity */
   blockedByImmunity: boolean;
-
-  /** New stun count */
   newStunCount: number;
-
-  /** Whether Watcher became enraged */
   becameEnraged: boolean;
-
-  /** Whether Watcher became immune */
   becameImmune: boolean;
-
-  /** Turns in escape window (if stunned) */
   escapeWindowTurns: number;
-
-  /** Whether extraction is now unblocked */
   extractionUnblocked: boolean;
 }
 
-// ==================== Configuration Types ====================
+// ==================== Threshold Constants ====================
 
-/**
- * Dread configuration (loaded from configs/dread.json)
- * See 02-content-registry.md for full DreadConfig type
- */
 interface DreadThresholdRange {
   threshold: DreadThreshold;
   min: number;
@@ -409,19 +391,6 @@ const DREAD_THRESHOLDS: readonly DreadThresholdRange[] = [
   { threshold: 'terrified', min: 85, max: 99 },
   { threshold: 'breaking', min: 100, max: 100 },
 ];
-```
-
-### Factory Function
-
-```typescript
-/**
- * Create Dread manager instance
- */
-function createDreadManager(
-  config: DreadConfig,
-  eventBus: EventBus,
-  initialDread?: number
-): DreadManager;
 ```
 
 ---
@@ -493,6 +462,8 @@ function createDreadManager(
     "clarityPotion": -20
   },
 
+  "torchDreadReduction": 0.5,
+
   "watcher": {
     "hp": 999,
     "damage": 50,
@@ -541,195 +512,65 @@ function createDreadManager(
 
 ---
 
+## How Dread Changes Flow
+
+Since there's no DreadManager service, here's how Dread changes work:
+
+### Example: Enemy Killed
+
+```
+1. Combat system resolves enemy death
+2. Command handler calls: getDreadGainForKill(enemy.type, config)
+3. Command handler calls: calculateDreadChange({ amount, source }, state, config)
+4. Command handler dispatches: { type: 'PLAYER_DREAD_CHANGED', delta, source }
+5. Reducer updates SessionPlayerState.currentDread
+6. Command handler checks: wouldTriggerWatcher(newDread, 0, watcherActive)
+7. If true, dispatches: { type: 'WATCHER_SPAWNED' }
+```
+
+### Example: Torch Activated
+
+```
+1. Player uses torch item
+2. Command handler dispatches: { type: 'TORCH_ACTIVATED' }
+3. Reducer sets SessionState.torchActive = true, torchActivatedFloor = currentFloor
+4. Future Dread gains automatically reduced (calculateDreadChange checks torchActive)
+```
+
+### Example: Floor Descent
+
+```
+1. Player descends stairs
+2. Command handler dispatches: { type: 'TORCH_DEACTIVATED' } (torch expires on floor change)
+3. Command handler calls: getDreadGainForDescent(fromFloor, toFloor, config)
+4. Command handler dispatches: { type: 'PLAYER_DREAD_CHANGED', delta, source }
+```
+
+### Example: Presentation Layer Corruption
+
+```
+1. CLI needs to display enemy HP
+2. CLI calls: corruptNumericValue(enemy.currentHP, state.player.currentDread, context, config, rng)
+3. CLI displays result.display (may be corrupted)
+4. If veteranOverride exists, CLI shows: "HP: 15-25 [Veteran: 20]"
+```
+
+---
+
 ## Events Emitted
 
-### DREAD_CHANGED
+The Dread system itself doesn't emit events. However, other systems may emit these events when Dread-related state changes occur:
 
-Emitted when Dread value changes.
+| Event | When Emitted | Emitter |
+|-------|--------------|---------|
+| `DREAD_CHANGED` | After PLAYER_DREAD_CHANGED action | State change listener (optional) |
+| `DREAD_THRESHOLD_CROSSED` | When crossing threshold boundary | State change listener (optional) |
+| `WATCHER_WARNING` | At 85/90/95 Dread | Command handler |
+| `WATCHER_SPAWNED` | When Watcher spawns | Command handler |
+| `WATCHER_STUNNED` | When player stuns Watcher | Combat handler |
+| `WHISPER` | When whisper should display | Presentation layer |
 
-```typescript
-interface DreadChangedEvent {
-  type: 'DREAD_CHANGED';
-  timestamp: Timestamp;
-  delta: number;
-  newTotal: number;
-  source: string;
-  wasModified: boolean;
-  modifierSource?: string;
-}
-```
-
-### DREAD_THRESHOLD_CROSSED
-
-Emitted when crossing a threshold boundary.
-
-```typescript
-interface DreadThresholdCrossedEvent {
-  type: 'DREAD_THRESHOLD_CROSSED';
-  timestamp: Timestamp;
-  fromThreshold: DreadThreshold;
-  toThreshold: DreadThreshold;
-  direction: 'up' | 'down';
-  currentDread: number;
-}
-```
-
-### WATCHER_WARNING
-
-Emitted at high Dread levels before spawn.
-
-```typescript
-interface WatcherWarningEvent {
-  type: 'WATCHER_WARNING';
-  timestamp: Timestamp;
-  severity: 'noticed' | 'approaching' | 'imminent';
-  currentDread: number;
-  message: string;
-}
-
-// Warning thresholds:
-// - 'noticed' at 85 Dread: "Something stirs in the darkness. You feel watched."
-// - 'approaching' at 90 Dread: "The Watcher has noticed you. LEAVE NOW."
-// - 'imminent' at 95 Dread: "It's coming."
-```
-
-### WATCHER_SPAWNED
-
-Emitted when The Watcher spawns at 100 Dread.
-
-```typescript
-interface WatcherSpawnedEvent {
-  type: 'WATCHER_SPAWNED';
-  timestamp: Timestamp;
-  floor: FloorNumber;
-  roomId: string;
-  dreadAtSpawn: number;
-}
-```
-
-### WATCHER_STUNNED
-
-Emitted when player successfully stuns The Watcher.
-
-```typescript
-interface WatcherStunnedEvent {
-  type: 'WATCHER_STUNNED';
-  timestamp: Timestamp;
-  stunCount: number;
-  stunsRemaining: number;
-  damageDealt: number;
-  escapeWindowTurns: number;
-}
-```
-
-### WATCHER_ENRAGED
-
-Emitted when The Watcher becomes enraged after second stun.
-
-```typescript
-interface WatcherEnragedEvent {
-  type: 'WATCHER_ENRAGED';
-  timestamp: Timestamp;
-  damageMultiplier: number;
-}
-```
-
-### EXTRACTION_BLOCKED
-
-Emitted when Watcher blocks extraction.
-
-```typescript
-interface ExtractionBlockedEvent {
-  type: 'EXTRACTION_BLOCKED';
-  timestamp: Timestamp;
-  blockedBy: 'watcher';
-  canStun: boolean;
-}
-```
-
-### EXTRACTION_UNBLOCKED
-
-Emitted when extraction becomes available (Watcher stunned).
-
-```typescript
-interface ExtractionUnblockedEvent {
-  type: 'EXTRACTION_UNBLOCKED';
-  timestamp: Timestamp;
-  turnsToEscape: number;
-}
-```
-
-### WHISPER
-
-Emitted when a whisper message should appear in combat log.
-
-```typescript
-interface WhisperEvent {
-  type: 'WHISPER';
-  timestamp: Timestamp;
-  text: string;
-  isHint: boolean;
-  dreadLevel: number;
-}
-```
-
----
-
-## Events Subscribed
-
-| Event | Response |
-|-------|----------|
-| `ENEMY_KILLED` | Apply Dread gain based on enemy type |
-| `ROOM_ENTERED` | Increment exploration turn counter, check for +1 Dread per 5 turns |
-| `FLOOR_DESCENDED` | Apply floor descent Dread, deactivate torch |
-| `FLEE_ATTEMPTED` | Apply flee Dread cost |
-| `EVENT_OUTCOME` | Apply event-based Dread changes (horror encounters, forbidden texts) |
-| `ITEM_USED` | Process Dread recovery items (Calm Draught, Clarity Potion, Torch) |
-| `SHRINE_BLESSING_RECEIVED` | Process Dread recovery blessings |
-| `COMBAT_ENDED` | Check for Watcher spawn if deferred during boss |
-| `SESSION_ENDED` | Reset Watcher state |
-
----
-
-## State Managed
-
-This module operates on state managed by `03-state-management`:
-
-```typescript
-// In SessionPlayerState
-interface SessionPlayerState {
-  currentDread: number;
-  // ... other fields
-}
-
-// In DungeonState
-interface DungeonState {
-  watcherActive: boolean;
-  watcherCombat: WatcherCombatState | null;
-  // ... other fields
-}
-
-// In SessionState
-interface SessionState {
-  explorationTurns: number;
-  // ... other fields
-}
-```
-
-### Internal State (Not Persisted)
-
-```typescript
-interface DreadInternalState {
-  /** Whether torch effect is active */
-  torchActive: boolean;
-
-  /** Current floor where torch was activated */
-  torchActivatedFloor: FloorNumber | null;
-
-  /** Watcher spawn deferred (during boss fight) */
-  watcherSpawnDeferred: boolean;
-}
-```
+These events are for analytics/logging. State mutations happen via StateActions, not events.
 
 ---
 
@@ -739,44 +580,28 @@ interface DreadInternalState {
 
 | Case | Handling |
 |------|----------|
-| Dread goes negative | Clamp to 0 |
-| Dread exceeds 100 | Clamp to 100, trigger Watcher spawn |
+| Dread goes negative | Clamp to 0 in reducer |
+| Dread exceeds 100 | Clamp to 100 in reducer |
 | Multiple threshold crosses in one change | Emit events for each crossed threshold in order |
 | Recovery brings Dread to exactly threshold boundary | Threshold is the lower one (49 = calm, not uneasy) |
-| Dread change of 0 | No event emitted, no state change |
-| Negative change when already at 0 | Return actual change of 0 |
+| Dread change of 0 | Skip dispatch, no state change needed |
 
 ### Watcher Edge Cases
 
 | Case | Handling |
 |------|----------|
-| Reach 100 Dread during boss fight | Defer spawn until boss defeated |
-| Player dies during Watcher fight | Standard death handling, Watcher despawns |
+| Reach 100 Dread during boss fight | shouldSpawnWatcher returns deferred=true |
+| Player dies during Watcher fight | Standard death handling |
 | Watcher stun at exactly threshold | Stun succeeds (>= not >) |
-| Multiple hits in same turn exceed threshold | Only first hit counts for stun |
-| Escape window expires mid-room-transition | Watcher resumes from last position |
-| Watcher blocks extraction on Floor 1 | Same rules apply - must stun to escape |
-| Heavy Attack deals <20 damage | Stun fails, Watcher attacks |
-| Third stun attempt | Watcher becomes immune, enrages |
+| Third stun attempt | calculateWatcherStun returns blockedByImmunity=true |
 
 ### Corruption Edge Cases
 
 | Case | Handling |
 |------|----------|
-| Corruption roll succeeds but player has Tier 3 knowledge | Show corrupted value but add veteran override |
-| Room type corruption shows wrong type | Never corrupt current room, only previews |
-| Enemy HP corruption shows higher than max | Clamp displayed range to reasonable bounds |
-| Corruption during Watcher fight | Watcher stats are NOT corrupted (too important) |
-| Multiple corruption rolls for same value | Roll once per display update, cache result |
-
-### Recovery Edge Cases
-
-| Case | Handling |
-|------|----------|
-| Recovery at Dread 0 | No change (already at minimum) |
-| Use multiple recovery items same turn | All apply, stack normally |
-| Torch active + Dread recovery item | Apply reduction modifier to item's effect |
-| Recovery exceeds negative Dread | Clamp at 0 |
+| Player has Tier 3 knowledge + hallucination | Show corrupted value with veteran override |
+| Room type corruption | Never corrupt current room, only previews |
+| Corruption during Watcher fight | Watcher stats are NOT corrupted |
 
 ---
 
@@ -784,170 +609,72 @@ interface DreadInternalState {
 
 ### Unit Tests
 
-1. **Dread Value Tests**
-   - Apply positive change increases Dread
-   - Apply negative change decreases Dread
-   - Dread clamps at 0 and 100
-   - Torch modifier reduces Dread gain
+All functions are pure, making testing straightforward:
 
-2. **Threshold Tests**
-   - Correct threshold for boundary values (49 = calm, 50 = uneasy)
-   - Threshold crossing emits correct event
-   - Multiple threshold crosses in one change
-   - Direction correct for up/down crossing
+```typescript
+// Threshold tests
+test('getThresholdForDread returns calm for 49', () => {
+  expect(getThresholdForDread(49)).toBe('calm');
+});
 
-3. **Corruption Tests**
-   - Calm threshold: no corruption
-   - Uneasy threshold: 5% corruption rate over many rolls
-   - Corruption respects veteran knowledge override
-   - Numeric corruption stays within reasonable bounds
-   - String corruption picks from alternatives
+test('getThresholdForDread returns uneasy for 50', () => {
+  expect(getThresholdForDread(50)).toBe('uneasy');
+});
 
-4. **Watcher Tests**
-   - Spawns at exactly 100 Dread
-   - Blocks all extraction points
-   - Stun succeeds at >= threshold damage
-   - Stun fails below threshold
-   - Enrage triggers after second stun
-   - Immunity triggers after third stun attempt
-   - Escape window counts down correctly
-   - Deferred spawn during boss fight
+// Dread change tests
+test('calculateDreadChange applies torch reduction', () => {
+  const result = calculateDreadChange(
+    { amount: 10, source: { type: 'kill_enemy', enemyType: 'basic' } },
+    { torchActive: true },
+    config
+  );
+  expect(result.actualAmount).toBe(5); // 50% reduction
+  expect(result.torchApplied).toBe(true);
+});
 
-5. **Whisper Tests**
-   - Whisper chance scales with Dread
-   - Combat bonus applies in combat
-   - Near-death bonus applies at low HP
-   - Hints appear occasionally (different pool)
+// Corruption tests
+test('corruptNumericValue returns exact value at calm', () => {
+  const result = corruptNumericValue(100, 30, context, config, rng);
+  expect(result.wasCorrupted).toBe(false);
+  expect(result.display).toBe(100);
+});
 
-### Integration Tests
+// Watcher tests
+test('calculateWatcherStun succeeds at threshold', () => {
+  const result = calculateWatcherStun(20, watcherState, config);
+  expect(result.success).toBe(true);
+});
 
-1. **Combat Integration**
-   - Kill enemy applies correct Dread
-   - Watcher combat flows correctly
-   - Stun -> escape -> extraction path
-
-2. **Event Integration**
-   - Horror encounter applies Dread
-   - Forbidden text applies Dread
-   - Shrine blessing removes Dread
-
-3. **Exploration Integration**
-   - Exploration turns increment correctly
-   - Floor descent applies Dread + deactivates torch
+test('calculateWatcherStun fails below threshold', () => {
+  const result = calculateWatcherStun(19, watcherState, config);
+  expect(result.success).toBe(false);
+});
+```
 
 ### Property Tests
 
 ```typescript
-property("Dread always in [0, 100]", (changes: DreadChangeRequest[]) => {
-  const manager = createDreadManager(config, mockEventBus);
-  for (const change of changes) {
-    manager.applyDreadChange(change);
-  }
-  const dread = manager.getCurrentDread();
-  return dread >= 0 && dread <= 100;
-});
-
-property("Threshold matches Dread value", (dread: number) => {
-  const clampedDread = Math.max(0, Math.min(100, dread));
-  const threshold = getThresholdForDread(clampedDread);
+property("Dread threshold matches value", (dread: number) => {
+  const clamped = clamp(dread, 0, 100);
+  const threshold = getThresholdForDread(clamped);
   const range = DREAD_THRESHOLDS.find(t => t.threshold === threshold)!;
-  return clampedDread >= range.min && clampedDread <= range.max;
+  return clamped >= range.min && clamped <= range.max;
 });
 
-property("Corruption never affects input", (action: PlayerAction) => {
-  // High dread shouldn't change what action is executed
-  const manager = createDreadManager(config, mockEventBus, 100);
-  const result = processAction(action);
-  return result.actionType === action.type;
+property("Corruption never affects actual value", (value: number, dread: number) => {
+  const result = corruptNumericValue(value, dread, context, config, rng);
+  return result.actual === value;
 });
 
-property("Watcher stun count never exceeds 3", (stunAttempts: number[]) => {
-  const manager = createDreadManager(config, mockEventBus, 100);
-  for (const damage of stunAttempts) {
-    manager.processWatcherStun(damage);
+property("Watcher stun count never exceeds 3", (attempts: number[]) => {
+  let state = initialWatcherState;
+  for (const damage of attempts) {
+    const result = calculateWatcherStun(damage, state, config);
+    state = applyStunResult(state, result);
   }
-  const state = manager.getWatcherState()!;
   return state.stunCount <= 3;
 });
 ```
-
----
-
-## Implementation Notes
-
-### Corruption Algorithm
-
-The corruption system uses a layered approach:
-
-```
-1. Roll for corruption based on threshold chance
-2. If corrupted:
-   a. For numbers: blur to range OR add variance OR show "???"
-   b. For strings: pick random alternative OR show generic
-3. If player has Veteran Knowledge:
-   a. Still show corrupted value
-   b. Append veteran override in brackets
-4. Cache result for this display frame
-```
-
-### Corruption Severity by Threshold
-
-| Threshold | Number Display | String Display |
-|-----------|---------------|----------------|
-| Calm | Exact | Exact |
-| Uneasy | Range (+-10%) | Exact |
-| Shaken | Range (+-20%) | Occasionally wrong |
-| Terrified | "???" or large range | Often wrong |
-| Breaking | "???" | Frequently wrong |
-
-### Watcher Damage Calculation
-
-```typescript
-function calculateWatcherDamage(watcherState: WatcherState, playerBlocking: boolean, playerArmor: number): number {
-  const baseDamage = watcherState.isEnraged ? 75 : 50;
-
-  let damage = baseDamage;
-
-  // Block reduces by 50%
-  if (playerBlocking) {
-    damage = Math.floor(damage * 0.5);
-  }
-
-  // Armor reduces remaining
-  damage = Math.floor(damage * (1 - playerArmor));
-
-  return damage;
-}
-```
-
-### Stun Success Calculation
-
-```typescript
-function checkWatcherStun(damageDealt: number, watcherState: WatcherState, config: DreadConfig): boolean {
-  // Cannot stun if immune
-  if (watcherState.isImmune) {
-    return false;
-  }
-
-  // Damage must meet or exceed threshold
-  return damageDealt >= config.watcher.stunThreshold;
-}
-```
-
-### Whisper Generation
-
-Whispers are semi-random text injections in combat logs at high Dread. The system:
-
-1. Rolls against base chance + context bonuses
-2. Selects from appropriate pool (generic, combat, near-death, hints)
-3. Hints appear rarely (10% of whispers) and contain actual useful information
-4. Same whisper won't repeat in consecutive appearances
-
-### Performance Considerations
-
-- Cache corruption rolls per display frame
-- Threshold lookup is O(1) via direct calculation
-- Whisper pool selection is O(1) weighted random
 
 ---
 
@@ -956,36 +683,53 @@ Whispers are semi-random text injections in combat logs at high Dread. The syste
 ```typescript
 // src/core/dread/index.ts
 
-export type {
-  DreadManager,
+export {
+  // Threshold functions
+  getThresholdForDread,
+  getThresholdConfig,
+  isAtThreshold,
+  getThresholdDistance,
 
-  // Change types
+  // Dread change functions
+  calculateDreadChange,
+  wouldTriggerWatcher,
+  getDreadGainForKill,
+  getDreadGainForExploration,
+  getDreadGainForDescent,
+  getDreadRecoveryForRest,
+  getDreadRecoveryForConsumable,
+
+  // Corruption functions
+  getHallucinationChance,
+  shouldHallucinate,
+  corruptNumericValue,
+  corruptStringValue,
+  corruptRoomType,
+  generateWhisper,
+
+  // Watcher functions
+  shouldSpawnWatcher,
+  calculateWatcherStun,
+  calculateWatcherDamage,
+  isExtractionBlockedByWatcher,
+
+  // Constants
+  DREAD_THRESHOLDS,
+};
+
+export type {
   DreadChangeRequest,
   DreadSource,
-  DreadChangeResult,
-  DreadModifier,
+  DreadChangeCalculation,
   ThresholdDistance,
-
-  // Corruption types
   CorruptionContext,
   CorruptedValue,
   CorruptionType,
-
-  // Whisper types
   WhisperContext,
   WhisperTrigger,
-
-  // Watcher types
-  WatcherState,
+  WatcherSpawnCheck,
   WatcherStunResult,
-
-  // Config types
   DreadThresholdRange,
-};
-
-export {
-  createDreadManager,
-  DREAD_THRESHOLDS,
 };
 
 // Re-export threshold type from foundation
@@ -998,71 +742,23 @@ export type { DreadThreshold } from '../foundation';
 
 ### Information Corruption, Not Input Corruption
 
-The cardinal rule of the Dread system: **never break input reliability**. When a player presses "attack", they attack. When they choose "flee", the flee attempt executes. The corruption only affects what they SEE:
+The cardinal rule: **never break input reliability**. When a player presses "attack", they attack. The corruption only affects what they SEE:
 
 - Enemy HP shown might be wrong
 - Room type preview might lie
 - Item stats might be uncertain
 - Whispers might mislead
 
-But their commands ALWAYS execute as intended. This preserves player agency while creating paranoia and tension.
+But commands ALWAYS execute as intended. This preserves player agency while creating paranoia.
 
-### Progressive Escalation
+### Pure Functions Enable Reliable Testing
 
-Dread effects escalate gradually:
+With no stateful DreadManager:
+- Every function is deterministic given inputs
+- No mocking of services needed
+- No state synchronization bugs possible
+- Presentation layer can call corruption functions without side effects
 
-1. **Calm (0-49)**: Full accuracy. Player learns the game.
-2. **Uneasy (50-69)**: Subtle hints something is wrong. 5% blur.
-3. **Shaken (70-84)**: Clear unreliability. Whispers appear. 15% corruption.
-4. **Terrified (85-99)**: Warnings about The Watcher. 25% corruption.
-5. **Breaking (100)**: The Watcher spawns. Gameplay shifts to escape.
+### State Lives in StateStore
 
-### The Watcher as Climactic Threat
-
-The Watcher is not meant to be fought - it's meant to be escaped. Its purpose:
-
-1. Create a hard ceiling on greed (can't farm indefinitely)
-2. Provide climactic "oh no" moment
-3. Test player skill (can you stun and escape?)
-4. Reward careful Dread management
-
-The stun mechanics ensure skilled players CAN escape, but it's not guaranteed. Repeated attempts get harder (enrage, immunity).
-
-### Veteran Knowledge Interaction
-
-When a player has earned Veteran Knowledge but is also experiencing Dread hallucinations, both show:
-
-```
-HP: 19?...29? [Veteran: 24]
-```
-
-Experience fights against madness. The player must reconcile conflicting information. At Terrified level, even the veteran text questions itself:
-
-```
-HP: ??? [Veteran: 24, but can you trust yourself?]
-```
-
-This rewards investment while preserving horror.
-
----
-
-## Future Enhancements
-
-### Equipment-Based Dread Modifiers (Deferred)
-
-**Not in MVP.** Equipment that reduces Dread gain (e.g., "Amulet of Calm: -10% Dread gain") was considered but deferred to simplify the architecture.
-
-**Current Dread management tools (sufficient for MVP):**
-- Torch (explicit activation, reduces Dread gain while active)
-- Rest (-25 Dread)
-- Consumables (Calm Draught -15, Clarity Potion -20)
-- Shrine blessings (-15 Dread)
-- Strategic extraction (player choice)
-
-**If added later, would require:**
-1. Add `CharacterService` and `StateStore` dependencies to DreadManager
-2. Subscribe to `ITEM_EQUIPPED`/`ITEM_UNEQUIPPED` events
-3. Cache equipment Dread reduction in internal state
-4. Include equipment modifiers in `getDreadGainReduction()` calculation
-
-This is an advanced build customization option, not a core mechanic.
+All mutable Dread-related state (`currentDread`, `torchActive`, `watcherActive`) lives in StateStore. This module provides the math; state management provides the storage.

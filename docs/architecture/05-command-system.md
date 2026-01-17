@@ -371,7 +371,7 @@ interface CombatPassCommand {
 
 interface CombatUseItemCommand {
   type: 'COMBAT_USE_ITEM';
-  itemId: EntityId;
+  slotIndex: number;
 }
 
 interface CombatFleeCommand {

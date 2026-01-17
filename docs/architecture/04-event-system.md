@@ -376,6 +376,24 @@ interface ItemPurchasedEvent {
   fromBuyback: boolean;
 }
 
+interface StashItemAddedEvent {
+  type: 'STASH_ITEM_ADDED';
+  timestamp: Timestamp;
+  itemId: EntityId;
+  templateId: string;
+  itemName: string;
+  stashSlotIndex: number;
+}
+
+interface StashItemRemovedEvent {
+  type: 'STASH_ITEM_REMOVED';
+  timestamp: Timestamp;
+  itemId: EntityId;
+  templateId: string;
+  itemName: string;
+  destination: 'inventory' | 'equipped';
+}
+
 // ==================== Progression Events ====================
 
 interface XPGainedEvent {
@@ -542,7 +560,7 @@ interface ExtractionTauntEvent {
   timestamp: Timestamp;
   nextRoomType: RoomType;
   contentHint: string;
-  rarity?: Rarity;
+  chestType?: 'standard' | 'locked' | 'ornate';
 }
 
 // ==================== Death Events ====================
@@ -669,6 +687,27 @@ interface GameLoadedEvent {
   lastPlayed: Timestamp;
 }
 
+interface ProfileCreatedEvent {
+  type: 'PROFILE_CREATED';
+  timestamp: Timestamp;
+  profileName: string;
+  playerType: 'human' | 'ai_agent';
+}
+
+interface ProfileDeletedEvent {
+  type: 'PROFILE_DELETED';
+  timestamp: Timestamp;
+  profileName: string;
+}
+
+interface SaveRecoveryAttemptedEvent {
+  type: 'SAVE_RECOVERY_ATTEMPTED';
+  timestamp: Timestamp;
+  profileName: string;
+  success: boolean;
+  method: 'backup' | 'partial' | 'reset';
+}
+
 interface WhisperEvent {
   type: 'WHISPER';
   timestamp: Timestamp;
@@ -714,6 +753,8 @@ type GameEvent =
   | ItemUsedEvent
   | ItemSoldEvent
   | ItemPurchasedEvent
+  | StashItemAddedEvent
+  | StashItemRemovedEvent
 
   // Progression
   | XPGainedEvent
@@ -764,6 +805,9 @@ type GameEvent =
   // System
   | GameSavedEvent
   | GameLoadedEvent
+  | ProfileCreatedEvent
+  | ProfileDeletedEvent
+  | SaveRecoveryAttemptedEvent
   | WhisperEvent;
 ```
 
@@ -951,6 +995,8 @@ export type {
   ItemUsedEvent,
   ItemSoldEvent,
   ItemPurchasedEvent,
+  StashItemAddedEvent,
+  StashItemRemovedEvent,
   XPGainedEvent,
   LevelUpEvent,
   StatIncreasedEvent,
@@ -983,6 +1029,9 @@ export type {
   MutatorUnlockedEvent,
   GameSavedEvent,
   GameLoadedEvent,
+  ProfileCreatedEvent,
+  ProfileDeletedEvent,
+  SaveRecoveryAttemptedEvent,
   WhisperEvent,
 };
 

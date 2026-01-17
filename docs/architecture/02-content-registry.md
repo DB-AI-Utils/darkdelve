@@ -726,6 +726,9 @@ interface GameConfig {
   // Currency
   startingGold: number;
   identificationCost: number;
+
+  // Profiles
+  defaultProfileName: string;
 }
 
 interface CombatConfig {

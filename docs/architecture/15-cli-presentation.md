@@ -24,7 +24,7 @@ Human-readable command-line interface for DARKDELVE. The CLI presentation layer 
 
 ## Dependencies
 
-- **01-foundation**: Types (EntityId, Rarity, RoomType, DreadThreshold, etc.), Timestamp
+- **01-foundation**: Types (EntityId, Rarity, RoomType, DreadThreshold, etc.), Timestamp, SeededRNG
 - **02-content-registry**: ItemTemplate, MonsterTemplate (for display names/descriptions)
 - **03-state-management**: GameState, GamePhase, CombatState, DungeonState, ProfileState
 - **04-event-system**: EventBus, all GameEvent types (subscription for reactive updates)
@@ -32,7 +32,7 @@ Human-readable command-line interface for DARKDELVE. The CLI presentation layer 
 - **03-state-management**: DerivedState (for stat display)
 - **07-item-system**: ItemRiskStatus, ItemDescription, ResolvedItem
 - **08-combat-system**: CombatState, DamageBreakdown, CombatLogEntry
-- **09-dread-system**: DreadManager (for corruption filters), CorruptedValue, DreadThreshold
+- **09-dread-system**: Corruption pure functions (corruptNumericValue, corruptStringValue, etc.), CorruptedValue, DreadThreshold
 - **10-dungeon-system**: RoomInstanceState, FloorState (for map rendering)
 - **11-extraction-system**: ExtractionCost (for display)
 - **12-camp-system**: CampStateView, all camp view types
@@ -182,11 +182,34 @@ type ScreenType =
 interface RenderContext {
   state: GameState;
   derivedState: DerivedState;
-  dreadManager: DreadManager;
   availableCommands: AvailableCommand[];
   recentEvents: readonly GameEvent[];
-  rng: SeededRNG;
+  /**
+   * Isolated SeededRNG for visual effects. Created via createPresentationRNG().
+   * CRITICAL: This is NOT the gameplay RNG - never pass the session's gameplay RNG here.
+   */
+  presentationRng: SeededRNG;
+  /** DreadConfig from ContentRegistry, cached for corruption calls */
+  dreadConfig: DreadConfig;
 }
+
+/**
+ * Create an isolated SeededRNG instance for presentation/rendering.
+ *
+ * CRITICAL: Rendering must NEVER consume the gameplay RNG sequence. This factory
+ * creates a separate SeededRNG instance with a derived seed, ensuring:
+ * - Visual effects don't affect gameplay determinism
+ * - Same game state produces consistent visual corruption
+ * - Gameplay replays remain reproducible regardless of rendering
+ *
+ * Seed derivation: sessionSeed XOR hash(currentDread, currentRoomId, frameCounter)
+ */
+function createPresentationRNG(
+  sessionSeed: number,
+  currentDread: number,
+  currentRoomId: string | null,
+  frameCounter: number
+): SeededRNG;
 
 interface PrintOptions {
   color?: TerminalColor;
@@ -458,11 +481,12 @@ interface DreadEffects {
   /**
    * Apply text corruption to a string
    * Letter substitution, character swaps
+   * NOTE: Uses PresentationRNG, never gameplay RNG
    */
   corruptText(
     text: string,
     dreadLevel: number,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): string;
 
   /**
@@ -477,21 +501,23 @@ interface DreadEffects {
   /**
    * Generate whisper text injection
    * Returns text to insert in combat log or null
+   * NOTE: Uses PresentationRNG, never gameplay RNG
    */
   generateWhisperText(
     dreadLevel: number,
     context: WhisperContext,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): WhisperText | null;
 
   /**
    * Apply screen "flicker" effect
    * Returns modified text with visual glitches
+   * NOTE: Uses PresentationRNG, never gameplay RNG
    */
   applyFlicker(
     text: string,
     dreadLevel: number,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): string;
 
   /**
@@ -501,8 +527,9 @@ interface DreadEffects {
 
   /**
    * Check if screen should show static/noise
+   * NOTE: Uses PresentationRNG, never gameplay RNG
    */
-  shouldShowStatic(dreadLevel: number, rng: SeededRNG): boolean;
+  shouldShowStatic(dreadLevel: number, rng: PresentationRNG): boolean;
 }
 
 interface WhisperText {
@@ -577,7 +604,7 @@ interface StatusBarRenderer {
     derivedState: DerivedState,
     gold: number,
     dreadManager: DreadManager,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): string[];
 }
 
@@ -593,7 +620,7 @@ function renderStatusBar(
   dread: number,
   gold: number,
   dreadManager: DreadManager,
-  rng: SeededRNG
+  rng: PresentationRNG
 ): string;
 
 // === Combat Display ===
@@ -611,7 +638,7 @@ interface CombatRenderContext {
   derivedState: DerivedState;
   availableActions: AvailableCombatAction[];
   dreadManager: DreadManager;
-  rng: SeededRNG;
+  rng: PresentationRNG;
   lessonLearned: LessonLearnedState | null;
 }
 
@@ -627,7 +654,7 @@ function renderCombatLog(
   log: readonly CombatLogEntry[],
   maxLines: number,
   dreadManager: DreadManager,
-  rng: SeededRNG
+  rng: PresentationRNG
 ): string[];
 
 // === Room/Map Display ===
@@ -640,7 +667,7 @@ interface MapRenderer {
     floor: FloorState,
     currentRoomId: string,
     dreadManager: DreadManager,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): string[];
 }
 
@@ -652,7 +679,7 @@ interface RoomRenderer {
     room: RoomInstanceState,
     adjacentRooms: RoomPreview[],
     dreadManager: DreadManager,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): string[];
 }
 
@@ -674,7 +701,7 @@ interface BacktrackMenuRenderer {
   render(
     clearedRooms: BacktrackOption[],
     dreadManager: DreadManager,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): string[];
 }
 
@@ -705,7 +732,7 @@ interface ItemRenderer {
     item: ResolvedItem,
     riskStatus: ItemRiskStatus,
     currentDread: number,
-    rng: SeededRNG
+    rng: PresentationRNG
   ): string[];
 
   /**
@@ -1576,6 +1603,7 @@ export type {
   RenderContext,
   PrintOptions,
   TerminalDimensions,
+  PresentationRNG,
 
   // Input
   InputParser,
@@ -1623,6 +1651,7 @@ export {
   createColorUtils,
   createDreadEffects,
   createAsciiArtRenderer,
+  createPresentationRNG,
 
   // Constants
   DEFAULT_SHORTCUTS,

@@ -189,11 +189,11 @@ Modules must be implemented in dependency order. Each phase builds on the previo
 | 02-Content Registry | 01 |
 | 03-State Management | 01, 02 |
 | 04-Event System | 01 |
-| 05-Command System | 01, 03, 04 |
+| 05-Command System | 01, 02, 03, 04 |
 | 06-Character | 01, 02, 03, 05 |
-| 07-Item | 01, 02, 06 |
+| 07-Item | 01, 02, 03 |
 | 08-Combat | 01, 02, 04, 06, 07 |
-| 09-Dread | 01, 02, 04, 06 |
+| 09-Dread | 01, 02 |
 | 10-Dungeon | 01, 02, 03, 04, 08 |
 | 11-Extraction | 01, 02, 04, 07, 09, 10 |
 | 12-Camp | 01, 02, 03, 04, 05, 06, 07 |

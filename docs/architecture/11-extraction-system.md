@@ -23,12 +23,13 @@ Manages the core gameplay loop of DARKDELVE: the extraction dilemma. This module
 
 ## Dependencies
 
-- **01-foundation**: Types (`FloorNumber`, `EntityId`, `Rarity`, `RoomType`), `Result`, `SeededRNG`
-- **02-content-registry**: `ExtractionConfig`, loot table access for Taunt generation
+- **01-foundation**: Types (`FloorNumber`, `EntityId`, `RoomType`), `Result`, `SeededRNG`
+- **02-content-registry**: `ExtractionConfig`
 - **04-event-system**: Event emission (`EXTRACTION_*`, `ITEMS_LOST`, `LESSON_LEARNED_*`)
 - **07-item-system**: `ItemInstance`, `ItemSource`, `ItemRiskStatus`, inventory/stash operations
-- **09-dread-system**: `DreadManager` for extraction blocking (Watcher) and desperation Dread cost
-- **10-dungeon-system**: `DungeonSystem` (facade providing navigation and room state for Taunt generation)
+- **09-dread-system**: Dread utility functions for extraction blocking (Watcher) and desperation Dread cost
+
+> **Note:** Taunt generation requires `NextRoomContents` which the command handler builds by querying dungeon state and ContentRegistry. The extraction service does not directly depend on dungeon-system.
 
 ---
 
@@ -323,8 +324,8 @@ interface ExtractionTaunt {
   /** Human-readable hint about contents */
   contentHint: string;
 
-  /** Rarity of item if treasure room (never Legendary) */
-  itemRarity: Rarity | null;
+  /** Chest type if treasure room */
+  chestType: 'standard' | 'locked' | 'ornate' | null;
 
   /** Full taunt message for display */
   message: string;
@@ -333,7 +334,7 @@ interface ExtractionTaunt {
 interface NextRoomContents {
   roomType: RoomType;
   hasChest: boolean;
-  chestRarity: Rarity | null;
+  chestType: 'standard' | 'locked' | 'ornate' | null;
   enemyName: string | null;
   eventType: string | null;
 }
@@ -528,14 +529,13 @@ interface LessonLearnedDamageResult {
 ```typescript
 /**
  * Create extraction service instance.
- * Uses DungeonSystem facade for next room queries (Taunt generation).
+ * Taunt generation requires NextRoomContents from caller (command handler
+ * queries dungeon + ContentRegistry to build this).
  */
 function createExtractionService(
   config: ExtractionConfig,
   eventBus: EventBus,
-  itemService: ItemService,
-  dreadManager: DreadManager,
-  dungeonSystem: DungeonSystem
+  itemService: ItemService
 ): ExtractionService;
 
 /**
@@ -621,8 +621,8 @@ function createLessonLearnedService(
 
   "taunt": {
     "enabled": true,
-    "neverShowLegendary": true,
-    "showItemRarity": true,
+    "showChestType": true,
+    "highlightOrnateChest": true,
     "showEnemyHint": true,
     "showEventHint": true
   }
@@ -708,7 +708,7 @@ interface ExtractionTauntEvent {
   timestamp: Timestamp;
   nextRoomType: RoomType;
   contentHint: string;
-  rarity?: Rarity;
+  chestType?: 'standard' | 'locked' | 'ornate';
 }
 ```
 
@@ -864,11 +864,8 @@ type ExtractionBlockedReason =
   | 'wrong_room_type'
   | 'floor_5_no_retreat';
 
-// In PersistentPlayerState
-interface PersistentPlayerState {
-  /** Active Lesson Learned */
-  lessonLearned: LessonLearnedInfo | null;
-}
+// Lesson Learned is stored in ProfileState (see 03-state-management.md)
+// Access via: state.profile.lessonLearned
 ```
 
 ---
@@ -923,8 +920,8 @@ interface PersistentPlayerState {
 
 | Case | Handling |
 |------|----------|
-| Next room is boss | Show boss hint, no item rarity |
-| Next room has Legendary | Show Epic instead (never show Legendary) |
+| Next room is boss | Show boss hint, no chest type |
+| Next room has ornate chest | Show "[VALUABLE TREASURE DETECTED]" tag |
 | Next room is empty | Show room type only |
 | Next room is stairwell | Show "deeper darkness awaits" |
 | No next room (end of floor) | Skip taunt |
@@ -1022,7 +1019,7 @@ property("lesson learned damage bonus is 10%", (baseDamage: number) => {
   return true;
 });
 
-property("taunt never shows legendary", (roomContents: NextRoomContents) => {
+property("taunt chest type matches input", (roomContents: NextRoomContents) => {
   const taunt = generateTaunt({
     currentFloor: 3,
     nextRoomType: roomContents.roomType,
@@ -1030,7 +1027,8 @@ property("taunt never shows legendary", (roomContents: NextRoomContents) => {
     rng: createRNG(12345),
   });
 
-  return taunt.itemRarity !== 'legendary';
+  // Chest type should pass through unchanged
+  return taunt.chestType === roomContents.chestType;
 });
 ```
 
@@ -1141,7 +1139,7 @@ Critical: Charge decrements at expedition START, not end:
 
 ```typescript
 function onExpeditionStart(state: GameState): GameState {
-  const lessonLearned = state.persistentPlayer.lessonLearned;
+  const lessonLearned = state.profile.lessonLearned;
 
   if (!lessonLearned) {
     return state;
@@ -1165,20 +1163,21 @@ function onExpeditionStart(state: GameState): GameState {
       wasUsed: false, // Will be set true if bonus applies during run
     }));
 
+    // Dispatch LESSON_LEARNED_CLEARED action (see 03-state-management.md)
     return {
       ...state,
-      persistentPlayer: {
-        ...state.persistentPlayer,
+      profile: {
+        ...state.profile,
         lessonLearned: null,
       },
     };
   }
 
-  // Update runs remaining
+  // Dispatch LESSON_LEARNED_DECREMENTED action (see 03-state-management.md)
   return {
     ...state,
-    persistentPlayer: {
-      ...state.persistentPlayer,
+    profile: {
+      ...state.profile,
       lessonLearned: {
         ...lessonLearned,
         runsRemaining: newRunsRemaining,
@@ -1190,24 +1189,19 @@ function onExpeditionStart(state: GameState): GameState {
 
 ### Taunt Generation
 
-Never show Legendary items:
+Describe chest type thematically:
 
 ```typescript
 function generateTaunt(params: TauntParams): ExtractionTaunt {
   const { nextRoomType, nextRoomContents, rng } = params;
 
   let contentHint: string;
-  let itemRarity: Rarity | null = null;
+  let chestType: 'standard' | 'locked' | 'ornate' | null = null;
 
   switch (nextRoomType) {
     case 'treasure':
-      // Downgrade Legendary to Epic for taunt
-      itemRarity = nextRoomContents.chestRarity === 'legendary'
-        ? 'epic'
-        : nextRoomContents.chestRarity;
-      contentHint = itemRarity
-        ? `An ornate chest glows with ${itemRarity} light.`
-        : 'A chest sits unopened.';
+      chestType = nextRoomContents.chestType;
+      contentHint = getChestHint(chestType);
       break;
 
     case 'combat':
@@ -1228,26 +1222,39 @@ function generateTaunt(params: TauntParams): ExtractionTaunt {
       contentHint = 'The unknown stretches before you.';
   }
 
-  const message = buildTauntMessage(nextRoomType, contentHint, itemRarity);
+  const message = buildTauntMessage(nextRoomType, contentHint, chestType);
 
   return {
     nextRoomType,
     contentHint,
-    itemRarity,
+    chestType,
     message,
   };
+}
+
+function getChestHint(chestType: 'standard' | 'locked' | 'ornate' | null): string {
+  switch (chestType) {
+    case 'ornate':
+      return 'An ornate chest sits unopened, its gilded surface gleaming.';
+    case 'locked':
+      return 'A locked chest waits, its iron bands promising secrets within.';
+    case 'standard':
+      return 'A chest sits unopened in the darkness.';
+    default:
+      return 'Something glints in the shadows.';
+  }
 }
 
 function buildTauntMessage(
   roomType: RoomType,
   contentHint: string,
-  rarity: Rarity | null
+  chestType: 'standard' | 'locked' | 'ornate' | null
 ): string {
   const intro = 'Through the shimmering portal, you glimpse the chamber beyond:';
-  const rarityTag = rarity ? `[${rarity.toUpperCase()} RARITY DETECTED]` : '';
+  const chestTag = chestType === 'ornate' ? '[VALUABLE TREASURE DETECTED]' : '';
   const outro = "The portal seals. You'll never know what was inside.";
 
-  return `${intro}\n\n    ${contentHint}\n    ${rarityTag}\n\n${outro}`;
+  return `${intro}\n\n    ${contentHint}\n    ${chestTag}\n\n${outro}`;
 }
 ```
 

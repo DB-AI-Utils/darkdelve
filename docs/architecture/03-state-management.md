@@ -90,14 +90,14 @@ type GamePhase =
  * ID mapping exists. This value must be filesystem-safe (alphanumeric,
  * dash, underscore only) and is used as the directory name in profiles/.
  *
- * Validation rules are defined in 13-save-system.md profileNameRules config.
+ * Validation rules are defined in 13-save-system.md internal constants.
  */
 interface ProfileState {
   /**
    * Profile identifier and display name (same value).
    * Must be filesystem-safe: alphanumeric, dash, underscore only.
    * Used as directory name: profiles/{name}/
-   * Validated by ProfileManager.createProfile() against profileNameRules.
+   * Validated by ProfileManager.createProfile() against internal constants.
    */
   readonly name: string;
 
@@ -374,6 +374,12 @@ interface SessionState {
 
   /** Exploration turn counter (for Dread) */
   readonly explorationTurns: number;
+
+  /** Whether torch is active (reduces Dread gain) */
+  readonly torchActive: boolean;
+
+  /** Floor where torch was activated (torch expires on floor change) */
+  readonly torchActivatedFloor: FloorNumber | null;
 }
 
 interface SessionPlayerState {
@@ -719,7 +725,7 @@ type CombatAction =
   | { type: 'dodge' }
   | { type: 'block' }
   | { type: 'pass' }
-  | { type: 'use_item'; itemId: EntityId }
+  | { type: 'use_item'; slotIndex: number }
   | { type: 'flee' };
 
 // ==================== Watcher State ====================
@@ -858,7 +864,7 @@ type StateAction =
 
   // Combat actions
   | { type: 'COMBAT_STARTED'; payload: { combat: CombatState } }
-  | { type: 'COMBAT_ACTION_EXECUTED'; payload: { action: CombatAction; result: CombatActionResult } }
+  | { type: 'COMBAT_ACTION_EXECUTED'; payload: { action: CombatAction; effects: CombatActionEffects } }
   | { type: 'COMBAT_TURN_ADVANCED'; payload: {} }
   | { type: 'COMBAT_ENDED'; payload: { result: 'victory' | 'defeat' | 'fled' } }
   | { type: 'COMBAT_LOG_ADDED'; payload: { entry: CombatLogEntry } }
@@ -902,10 +908,21 @@ type StateAction =
   | { type: 'WATCHER_ENRAGED'; payload: {} }
   | { type: 'WATCHER_DEFEATED'; payload: {} }
 
+  // Torch actions
+  | { type: 'TORCH_ACTIVATED'; payload: { floor: FloorNumber } }
+  | { type: 'TORCH_DEACTIVATED'; payload: {} }
+
   // Phase actions
   | { type: 'PHASE_CHANGED'; payload: { phase: GamePhase } };
 
-interface CombatActionResult {
+/**
+ * Effects/consequences of a combat action.
+ * Used as payload for COMBAT_ACTION_EXECUTED state action.
+ *
+ * CANONICAL TYPE: This is the authoritative definition for combat action effects.
+ * Combat System (08) should import this type for its CombatActionResult.data field.
+ */
+interface CombatActionEffects {
   hit: boolean;
   damage: number;
   critical: boolean;
@@ -929,7 +946,7 @@ interface CombatActionResult {
  * when handling CREATE_PROFILE commands.
  *
  * Note: This function does NOT validate profileName - validation happens in
- * ProfileManager.createProfile() against profileNameRules. Callers should
+ * ProfileManager.createProfile() against internal constants. Callers should
  * either pre-validate or rely on ProfileManager to reject invalid names.
  *
  * @param profileName - Profile identifier (must be filesystem-safe: alphanumeric,
@@ -1208,7 +1225,7 @@ export type {
   Unsubscribe,
   StateStoreOptions,
   StateAction,
-  CombatActionResult,
+  CombatActionEffects,
 
   // Utilities
   DerivedState,
