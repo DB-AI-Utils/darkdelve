@@ -255,7 +255,7 @@ interface ItemStatBlock {
   /** Flat HP bonus */
   bonusHP?: number;
 
-  /** Armor percentage (0-100) */
+  /** Armor value (0-1, where 0.40 = 40% reduction) */
   armor?: number;
 
   /** Stat bonuses */
@@ -372,7 +372,7 @@ interface MonsterTemplate {
   damageMin: number;
   damageMax: number;
 
-  /** Armor percentage */
+  /** Armor value (0-1, where 0.40 = 40% reduction) */
   armor: number;
 
   /** Speed category */
@@ -748,6 +748,7 @@ interface CombatConfig {
   maxStamina: number;
   staminaRegenBase: number;
   staminaRegenOnPass: number;
+  dodgeStaminaBonus: number;
 
   // Actions
   lightAttackCost: number;
@@ -759,6 +760,7 @@ interface CombatConfig {
   heavyAttackMultiplier: number;
   heavyAttackStaggerChance: number;
   heavyAttackArmorPen: number;
+  slowEnemyHeavyBonus: number;
 
   // Block
   blockDamageReduction: number;
@@ -785,6 +787,10 @@ interface CombatConfig {
   // Turn order
   fastEnemyFirstStrike: boolean;
   ambushFreeActions: number;
+
+  // Boss stagger
+  bossStaggerThreshold: number;
+  bossStaggerWindow: number;
 }
 
 interface DreadConfig {
@@ -1226,6 +1232,7 @@ darkdelve/
   "maxStamina": 4,
   "staminaRegenBase": 2,
   "staminaRegenOnPass": 2,
+  "dodgeStaminaBonus": 1,
 
   "lightAttackCost": 1,
   "heavyAttackCost": 3,
@@ -1235,6 +1242,7 @@ darkdelve/
   "heavyAttackMultiplier": 2.0,
   "heavyAttackStaggerChance": 0.50,
   "heavyAttackArmorPen": 0.25,
+  "slowEnemyHeavyBonus": 0.25,
 
   "blockDamageReduction": 0.50,
 
@@ -1255,7 +1263,10 @@ darkdelve/
   "fleeBlockedOnAmbush": true,
 
   "fastEnemyFirstStrike": true,
-  "ambushFreeActions": 2
+  "ambushFreeActions": 2,
+
+  "bossStaggerThreshold": 2,
+  "bossStaggerWindow": 3
 }
 ```
 
