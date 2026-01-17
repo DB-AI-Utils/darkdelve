@@ -29,14 +29,14 @@ Human-readable command-line interface for DARKDELVE. The CLI presentation layer 
 - **03-state-management**: GameState, GamePhase, CombatState, DungeonState, ProfileState
 - **04-event-system**: EventBus, all GameEvent types (subscription for reactive updates)
 - **05-command-system**: CommandProcessor, GameCommand, AvailableCommand, CommandResult
-- **06-character-system**: DerivedState (for stat display)
+- **03-state-management**: DerivedState (for stat display)
 - **07-item-system**: ItemRiskStatus, ItemDescription, ResolvedItem
 - **08-combat-system**: CombatState, DamageBreakdown, CombatLogEntry
 - **09-dread-system**: DreadManager (for corruption filters), CorruptedValue, DreadThreshold
 - **10-dungeon-system**: RoomInstanceState, FloorState (for map rendering)
 - **11-extraction-system**: ExtractionCost (for display)
 - **12-camp-system**: CampStateView, all camp view types
-- **13-save-system**: ProfileInfo (for load/save UI)
+- **13-save-system**: ProfileMetadata (for load/save UI)
 
 ---
 
@@ -663,6 +663,38 @@ interface RoomPreview {
   isCorrupted: boolean;
 }
 
+// === Backtrack Selection ===
+
+interface BacktrackMenuRenderer {
+  /**
+   * Render menu of cleared rooms for backtrack selection.
+   * Triggered by "back" or "return" command without a target.
+   * Player selects a numbered option, which constructs MOVE_BACK with roomId.
+   */
+  render(
+    clearedRooms: BacktrackOption[],
+    dreadManager: DreadManager,
+    rng: SeededRNG
+  ): string[];
+}
+
+interface BacktrackOption {
+  optionNumber: number;
+  roomId: string;
+  roomType: RoomType;
+  roomName: string;
+  distanceFromCurrent: number;
+}
+
+/**
+ * Backtrack flow:
+ * 1. Player enters "back" or "return"
+ * 2. CLI renders BacktrackMenuRenderer showing cleared rooms
+ * 3. Player enters a number (e.g., "2")
+ * 4. CLI constructs MOVE_BACK command with selected roomId
+ * 5. Alternative: Player enters "back 2" to skip menu (direct selection)
+ */
+
 // === Item Display ===
 
 interface ItemRenderer {
@@ -1016,8 +1048,9 @@ interface EventChoiceView {
     "east": "MOVE_EAST",
     "w": "MOVE_WEST",
     "west": "MOVE_WEST",
-    "back": "MOVE_BACK",
-    "return": "MOVE_BACK"
+    "back": "SHOW_BACKTRACK_MENU",
+    "return": "SHOW_BACKTRACK_MENU",
+    "back <n>": "MOVE_BACK"
   },
 
   "treasure": {

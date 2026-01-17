@@ -113,7 +113,7 @@ Every interaction is a decision with consequences. Chests might alert enemies or
                     ▼                           ▼
          ┌───────────────────┐       ┌───────────────────┐
          │    EXTRACTION     │       │      DEATH        │
-         │  - Keep all loot  │       │  - Lose unIDed    │
+         │  - Keep all loot  │       │  - Lose ALL items │
          │  - Complete quests│       │  - Gain bestiary  │
          │  - See what you   │       │  - Leave echo     │
          │    missed         │       │  - Unlock content │
@@ -323,7 +323,7 @@ Short sentences. Hard consonants. The FEEL of impact.
 | Death bestiary | P1 | Chronicler unlocks (binary: unknown/known for MVP) |
 | Item identification | P1 | Risk/reward for loot |
 | ASCII map | P1 | Floor navigation with room type preview |
-| Item risk indicators | P1 | [SAFE], [AT RISK], [PROTECTED], [VULNERABLE], [DOOMED] tags |
+| Item risk indicators | P1 | [SAFE] (stash), [AT RISK] (in dungeon) - simple two-state system |
 | Pre-boss warning | P1 | Threshold Chamber with readiness check |
 
 **MVP Enemy Content (Minimum for Replay Value):**
@@ -389,7 +389,7 @@ Research shows 3 enemy types is a SEVERE content gap. Target 8-10 minimum:
 | The Watcher feels unfair | MEDIUM | Clear visual/text signals before spawn. Give player time to react. Ensure fleeing The Watcher is possible (it pursues, not instakills). |
 | Turn-based combat feels slow | MEDIUM | Keep fights to 4-8 turns. Snappy UI. Show damage calculation as mini-celebration. |
 | Extraction makes deep floors feel optional | LOW | Best loot is floor 4-5 exclusive. Bounties require deep runs. Boss has Legendary chance. |
-| Stash items never used ("gear fear") | MEDIUM | Monitor usage rates. If <30% of runs bring items, consider partial recovery system. |
+| Stash items never used ("gear fear") | MEDIUM | Monitor usage rates. If <30% of runs bring items, consider "Soul Echo" recovery mechanic (1 item returns damaged) or reduce stash item power. |
 
 ---
 

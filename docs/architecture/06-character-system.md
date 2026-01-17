@@ -24,8 +24,7 @@ Provides character creation, stat calculation, leveling, derived value computati
 
 - **01-foundation**: Types (StatBlock, StatName, CharacterClass, NumericRange, Result), utility functions (clamp)
 - **02-content-registry**: ClassDefinition, ItemTemplate, MonsterTemplate, ProgressionConfig
-- **03-state-management**: CharacterState, EquipmentState, VeteranKnowledgeState, MonsterKnowledge, GameState, StateStore
-- **07-item-system**: ItemInstance
+- **03-state-management**: CharacterState, EquipmentState, VeteranKnowledgeState, MonsterKnowledge, GameState, StateStore, ItemInstance
 - **04-event-system**: EventBus, CombatStartedEvent, EnemyKilledEvent, PlayerKilledEvent (for KnowledgeService)
 
 ---
@@ -180,6 +179,17 @@ function createCharacterService(config: ProgressionConfig): CharacterService;
 /**
  * Manages Veteran Knowledge progression - permanent information unlocks
  * from combat experience. You get smarter, not stronger.
+ *
+ * SINGLE OWNER: KnowledgeService is the EXCLUSIVE owner of all
+ * VeteranKnowledge state mutations. All knowledge updates flow through
+ * event subscriptions handled by this service:
+ * - COMBAT_STARTED: Increment encounter counter
+ * - ENEMY_KILLED: Check tier unlock via encounters
+ * - PLAYER_KILLED: Increment death counter, check tier unlock
+ *
+ * Other modules (DeathEconomyService, CombatService) must NOT directly
+ * update knowledge state. They emit events that this service handles.
+ * This prevents double-application of knowledge updates.
  *
  * This service subscribes to combat events and manages:
  * - Monster encounter tracking
@@ -750,10 +760,10 @@ const CHARACTER_CONSTANTS = {
 // Starting stats: VIGOR 2, MIGHT 4, CUNNING 3
 // Passive: Pain Threshold - +25% damage when below 30% HP
 
-// Hollowed One (Unlockable) - Curse mastery
+// Hollowed One (Unlockable) - Dread mastery
 // Unlock: Die to The Watcher on Floor 3+
 // Starting stats: VIGOR 3, MIGHT 2, CUNNING 4
-// Passive: Void Touched - Immune to curse effects
+// Passive: Abyssal Resilience - 20% reduced Dread gain
 ```
 
 ---
@@ -891,7 +901,7 @@ const CHARACTER_CONSTANTS = {
 {
   "id": "hollowed_one",
   "name": "Hollowed One",
-  "description": "The Watcher's gaze revealed something within you. Curses hold no power here.",
+  "description": "The Watcher's gaze revealed something within you. The darkness holds no terror.",
   "lore": "The Watcher's gaze pierced your soul. You fell into the abyss... and found something there.",
 
   "startingStats": {
@@ -905,11 +915,12 @@ const CHARACTER_CONSTANTS = {
 
   "passives": [
     {
-      "id": "void_touched",
-      "name": "Void Touched",
-      "description": "Immune to curse effects. Cursed items can be unequipped freely.",
+      "id": "abyssal_resilience",
+      "name": "Abyssal Resilience",
+      "description": "20% reduced Dread gain from all sources.",
       "effect": {
-        "type": "curse_immunity"
+        "type": "dread_gain_reduction",
+        "magnitude": 0.20
       }
     }
   ],
@@ -1170,7 +1181,7 @@ The character service does not manage state directly. It operates on CharacterSt
 8. **Character Creation Tests**
    - Mercenary created with correct starting stats
    - Flagellant created with correct passives
-   - Hollowed One created with curse immunity
+   - Hollowed One created with Abyssal Resilience passive
    - Error returned for unknown class
    - Error returned for locked class
 

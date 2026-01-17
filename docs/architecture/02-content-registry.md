@@ -590,6 +590,8 @@ interface DungeonTemplate {
   // Boss
   bossId: string;
 
+  thresholdWarning: string;
+
   // Unlock
   unlocked: boolean;  // Available from start?
   unlockCondition?: UnlockCondition;

@@ -25,7 +25,6 @@ Manages all item-related operations: runtime item instances, inventory managemen
 - **01-foundation**: Types (EntityId, Rarity, EquipmentSlot, ItemSlot), Result, SeededRNG
 - **02-content-registry**: ItemTemplate, ConsumableData, ItemEffect, EffectType, LootTable
 - **03-state-management**: ItemInstance, ItemSource, InventoryState, EquipmentState, ConsumableSlotState, StashState
-- **06-character**: Equipment validation, class-specific rules (Hollowed One curse immunity)
 
 ---
 
@@ -61,22 +60,15 @@ interface ResolvedItem {
  * CANONICAL TYPE: This is the authoritative definition.
  * ExtractionSystem (11) imports this type rather than defining its own.
  *
- * Status determination priority (highest to lowest):
- * 1. source === 'starting' → 'safe' (starting gear always preserved)
- * 2. SessionState.broughtItems.includes(id) → 'at_risk' (brought from stash, always lost)
- * 3. !isEquipped → 'doomed' (carried items always lost)
- * 4. !identified → 'vulnerable' (equipped but unidentified, lost)
- * 5. identified → 'protected' (equipped + identified, survives)
+ * Simple two-state system:
+ * - Items in stash (at camp) → 'safe'
+ * - Items in dungeon (equipped, carried, or brought) → 'at_risk'
  *
- * Note: 'at_risk' is determined by checking SessionState.broughtItems,
- * not by item.source (which only stores original acquisition method).
+ * Full loss on death: ALL items in dungeon are lost. Only stash is safe.
  */
 type ItemRiskStatus =
-  | 'safe'        // Starting gear - cannot be lost
-  | 'protected'   // Equipped + identified - survives death
-  | 'vulnerable'  // Equipped but unidentified - lost on death
-  | 'at_risk'     // Brought from stash this run - always lost on death
-  | 'doomed';     // Carried (not equipped) - lost on death
+  | 'safe'        // In stash at camp - cannot be lost
+  | 'at_risk';    // In dungeon (any state) - lost on death
 ```
 
 ### Item Service
@@ -123,11 +115,12 @@ interface ItemService {
   ): ItemDescription;
 
   /**
-   * Calculate item's risk status
+   * Calculate item's risk status.
+   * Simple: items in stash are 'safe', items in dungeon are 'at_risk'.
    */
   getRiskStatus(
     item: ItemInstance,
-    isEquipped: boolean
+    isInStash: boolean
   ): ItemRiskStatus;
 
   // === Identification ===
@@ -205,12 +198,10 @@ interface ItemService {
   isCursed(item: ItemInstance): boolean;
 
   /**
-   * Check if curse prevents unequip
+   * Check if curse prevents unequip.
+   * Cursed items cannot be unequipped by any class.
    */
-  canUnequip(
-    item: ItemInstance,
-    classId: CharacterClass
-  ): Result<boolean, CurseBlockedError>;
+  canUnequip(item: ItemInstance): Result<boolean, CurseBlockedError>;
 
   /**
    * Get all active curse effects from equipment
@@ -412,19 +403,17 @@ interface InventoryService {
   equipItem(
     equipment: EquipmentState,
     inventory: InventoryState,
-    itemId: EntityId,
-    classId: CharacterClass
+    itemId: EntityId
   ): Result<EquipResult, GameError>;
 
   /**
    * Unequip item from slot
-   * Blocked by curses (except Hollowed One)
+   * Blocked by curses for all classes
    */
   unequipItem(
     equipment: EquipmentState,
     inventory: InventoryState,
-    slot: EquipmentSlot,
-    classId: CharacterClass
+    slot: EquipmentSlot
   ): Result<UnequipResult, GameError>;
 
   /**
@@ -433,8 +422,7 @@ interface InventoryService {
   swapEquipment(
     equipment: EquipmentState,
     inventory: InventoryState,
-    inventoryItemId: EntityId,
-    classId: CharacterClass
+    inventoryItemId: EntityId
   ): Result<SwapResult, GameError>;
 
   /**
@@ -557,7 +545,7 @@ interface StashService {
 
   /**
    * Prepare items to bring on expedition.
-   * Returns item IDs to track as brought for death economy.
+   * Removes items from stash; they become at-risk in the dungeon.
    */
   prepareBringItems(
     stash: StashState,
@@ -565,15 +553,14 @@ interface StashService {
   ): Result<PreparedBringResult, GameError>;
 
   /**
-   * Return surviving items to stash after death
-   * Handles identification-based survival
+   * Process death: all items in dungeon are lost.
+   * Full loss on death - no survival rules.
    */
-  returnSurvivingItems(
-    stash: StashState,
+  processDeathLoss(
     equipment: EquipmentState,
     inventory: InventoryState,
-    broughtItemIds: EntityId[]
-  ): DeathRecoveryResult;
+    goldCollected: number
+  ): DeathLossResult;
 
   /**
    * Deposit items after successful extraction
@@ -588,27 +575,19 @@ interface StashService {
 interface PreparedBringResult {
   stash: StashState;
   broughtItems: ItemInstance[];
-  broughtItemIds: EntityId[];
 }
 
-interface DeathRecoveryResult {
-  stash: StashState;
+interface DeathLossResult {
+  /** All items lost (everything in dungeon) */
   itemsLost: LostItemInfo[];
-  itemsPreserved: PreservedItemInfo[];
+  /** Gold lost */
+  goldLost: number;
 }
 
 interface LostItemInfo {
   itemId: EntityId;
   templateId: string;
   displayName: string;
-  reason: 'brought' | 'unidentified' | 'carried_identified';
-}
-
-interface PreservedItemInfo {
-  itemId: EntityId;
-  templateId: string;
-  displayName: string;
-  reason: 'equipped_identified' | 'starting_gear';
 }
 ```
 
@@ -898,8 +877,7 @@ interface BuybackResult {
 | `ITEM_USED` | Consumable used |
 | `ITEM_SOLD` | Item sold to merchant |
 | `ITEM_PURCHASED` | Item bought from merchant |
-| `ITEMS_LOST` | Items lost on death |
-| `ITEMS_PRESERVED` | Items saved on death |
+| `ITEMS_LOST` | Items lost on death (all items in dungeon) |
 
 ---
 
@@ -938,7 +916,7 @@ All state mutations are performed via state actions dispatched to the StateStore
 | Equip item not in inventory | Return `ITEM_NOT_FOUND` error |
 | Equip to wrong slot | Return `INVALID_STATE` error |
 | Equip weapon slot empty | Weapon slot cannot be empty - swap only |
-| Unequip cursed item | Return `ITEM_CURSED` error (except Hollowed One) |
+| Unequip cursed item | Return `ITEM_CURSED` error |
 | Unequip weapon with no replacement | Return `INVALID_STATE` error |
 
 ### Consumables
@@ -983,22 +961,20 @@ All state mutations are performed via state actions dispatched to the StateStore
 | Case | Handling |
 |------|----------|
 | Equip unidentified cursed item | Curse activates immediately, reveal curse |
-| Unequip cursed item (normal class) | Block with `ITEM_CURSED` error |
-| Unequip cursed item (Hollowed One) | Allow normally |
+| Unequip cursed item | Block with `ITEM_CURSED` error (all classes) |
 | Death with cursed equipped | Item lost like any other |
 | Multiple curse effects | All effects stack and apply |
 
-### Death Recovery
+### Death Loss
 
 | Case | Handling |
 |------|----------|
-| Equipped + Identified | Preserve to stash |
-| Equipped + Unidentified | Lost |
-| Carried + Identified | Lost (not equipped) |
-| Carried + Unidentified | Lost |
-| Brought from stash | Always lost |
-| Starting gear | Always preserved |
-| Stash full on recovery | Grant starter weapon, warn player |
+| Any item in dungeon | Lost (full loss on death) |
+| Equipped items | Lost |
+| Carried items | Lost |
+| Brought from stash | Lost |
+| Gold carried | Lost |
+| Items in stash | Safe (stash is never affected by death) |
 
 ---
 
@@ -1022,7 +998,7 @@ All state mutations are performed via state actions dispatched to the StateStore
    - Equip to correct slot
    - Slot validation
    - Curse activation on equip
-   - Hollowed One curse immunity
+   - Cursed items block unequip for all classes
    - Weapon slot never empty
 
 4. **Consumable Tests**
@@ -1050,12 +1026,12 @@ All state mutations are performed via state actions dispatched to the StateStore
    - Slot distribution correct
    - Floor-based scaling
 
-8. **Death Recovery Tests**
-   - Equipped + ID = preserve
-   - Carried + ID = lose
-   - Brought = always lose
-   - Starting = always preserve
-   - Stash capacity handling
+8. **Death Loss Tests**
+   - All equipped items lost
+   - All carried items lost
+   - All brought items lost
+   - All gold lost
+   - Stash remains unchanged
 
 ### Property-Based Tests
 
@@ -1081,13 +1057,10 @@ property("equipped items always have valid slot", (equipment) => {
   });
 });
 
-property("cursed items block unequip (except Hollowed One)", (item, classId) => {
-  if (!isCursed(item)) return true;
-  const result = inventoryService.canUnequip(item, classId);
-  if (classId === 'hollowed_one') {
-    return result.success && result.value === true;
-  }
-  return !result.success && result.error.code === 'ITEM_CURSED';
+property("death loses all items in dungeon", (equipment, inventory) => {
+  const result = stashService.processDeathLoss(equipment, inventory);
+  const totalItems = Object.values(equipment).filter(Boolean).length + inventory.items.length;
+  return result.itemsLost.length === totalItems;
 });
 
 property("loot rarity matches floor distribution", (floor, samples) => {
@@ -1114,8 +1087,8 @@ property("loot rarity matches floor distribution", (floor, samples) => {
 2. **Loot to Stash Flow**
    - Generate loot -> Pick up -> Extract -> Verify in stash
 
-3. **Death Recovery Flow**
-   - Bring items -> Die -> Verify correct preservation/loss
+3. **Death Loss Flow**
+   - Bring items -> Die -> Verify all items lost, stash unchanged
 
 4. **Merchant Flow**
    - Buy item -> Sell item -> Buyback item
@@ -1275,9 +1248,8 @@ export type {
   UseConsumableResult,
   ConsumableStackInfo,
   PreparedBringResult,
-  DeathRecoveryResult,
+  DeathLossResult,
   LostItemInfo,
-  PreservedItemInfo,
   LootGenerationParams,
   LootSource,
   LootTableParams,

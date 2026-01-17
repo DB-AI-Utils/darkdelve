@@ -1,110 +1,177 @@
-# Architecture Review - DARKDELVE (docs/architecture)
+# Architecture Review
 
-## Issues, References, and Potential Fixes
+## Problem Statement
+Review the architecture docs for module cohesion and cross-module references. Identify integration issues that would block or risk implementation, and propose targeted fixes to keep modules compatible without changing game design.
 
-### 1) Combat state shape mismatch (high risk)
-- **Issue**: `CombatState` differs between state management and combat system (phase enum, fields like `isAmbush`, `turnOrder`, derived combat stats). This makes reducers/serialization/presentation ambiguous and breaks integration.
-- **References**:
-  - `docs/architecture/03-state-management.md:544`
-  - `docs/architecture/08-combat-system.md:114`
-  - `docs/architecture/08-combat-system.md:146`
-- **Potential fix**:
-  - Choose a single canonical `CombatState` definition (preferably in state management), and have combat system import/extend it rather than redefining. If combat system needs extra transient fields, add them to `CombatState` or define a separate `CombatRuntimeState` that is explicitly not persisted.
+## Relevant Files
+- docs/architecture/00-overview.md
+- docs/architecture/01-foundation.md
+- docs/architecture/02-content-registry.md
+- docs/architecture/03-state-management.md
+- docs/architecture/04-event-system.md
+- docs/architecture/05-command-system.md
+- docs/architecture/06-character-system.md
+- docs/architecture/07-item-system.md
+- docs/architecture/08-combat-system.md
+- docs/architecture/09-dread-system.md
+- docs/architecture/10-dungeon-system.md
+- docs/architecture/11-extraction-system.md
+- docs/architecture/12-camp-system.md
+- docs/architecture/13-save-system.md
+- docs/architecture/14-analytics.md
+- docs/architecture/15-cli-presentation.md
+- docs/architecture/16-agent-mode.md
 
-### 2) Item runtime metadata missing from inventory/stash state (high risk)
-- **Issue**: Inventory/stash state lacks `source` and `acquiredAt`, but item/extraction systems require full `ItemInstance` data (e.g., `source` for death economy). This blocks correct loss/preservation logic.
-- **References**:
-  - `docs/architecture/07-item-system.md:42`
-  - `docs/architecture/03-state-management.md:189`
-  - `docs/architecture/03-state-management.md:499`
-- **Potential fix**:
-  - Store full `ItemInstance` in `InventoryState` and `StashState`, or add a centralized `ItemInstance` registry in state management keyed by `EntityId` and store only IDs in inventory/stash.
+## Findings and Potential Fixes
 
-### 3) Profile creation lacks class selection path (high risk)
-- **Issue**: Command system requires `classId` for profile creation, and state utilities require a class to create character state, but save/profile creation APIs don’t accept class input. This makes initial character creation undefined.
-- **References**:
-  - `docs/architecture/05-command-system.md:495`
-  - `docs/architecture/03-state-management.md:852`
-  - `docs/architecture/13-save-system.md:56`
-- **Potential fix**:
-  - Extend `ProfileManager.createProfile` (and its file format) to accept `classId`, or move profile creation entirely into command/state layer where class selection is already specified.
+### 1) ~~Circular dependency between Character and Item systems~~ (RESOLVED)
+- Issue: Character depends on Item (ItemInstance), and Item depends on Character (equip rules).
+- Impact: Violates dependency order; requires both modules to exist before either is complete.
+- Relevant files:
+  - docs/architecture/06-character-system.md
+  - docs/architecture/07-item-system.md
+- **Resolution:** Simplified game design by removing curse immunity passive from Hollowed One. Replaced with "Abyssal Resilience" (-20% Dread gain). Cursed items now bind all classes equally. Character imports ItemInstance from State Management (03) where it's canonically defined. Item System no longer depends on Character System.
 
-### 4) ~~Dungeon room instance mismatch~~ ✅ RESOLVED
-- **Resolution**: Added `floor` and `layoutIndex` to canonical `RoomInstanceState` in state management. Dungeon system now references the canonical definition instead of redefining it.
-- **Changes made**:
-  - `docs/architecture/03-state-management.md`: Added `floor: FloorNumber` and `layoutIndex: number` to `RoomInstanceState`
-  - `docs/architecture/10-dungeon-system.md`: Removed duplicate definition, added reference to canonical type
+### 2) ~~Dungeon state vs dungeon system mismatch~~ (RESOLVED)
+- Issue: Dungeon module defines fields not present in canonical state types (e.g., `isElite`, `leadsToNextFloor`, `warningText`) and uses `Direction` with `up/down` while state only has `north/south/east/west`.
+- Impact: State cannot represent dungeon outputs; serialization/invariants break.
+- Relevant files:
+  - docs/architecture/02-content-registry.md
+  - docs/architecture/03-state-management.md
+  - docs/architecture/10-dungeon-system.md
+- **Resolution:** Applied hybrid approach - runtime state fields added to canonical types, derivable/content fields removed from dungeon types:
+  - Added `isElite` to `CombatRoomContents` in State Management (runtime state affecting combat)
+  - Added `exitUnlocked` to `BossRoomContents` in State Management (runtime state for extraction)
+  - Added `thresholdWarning` to `DungeonTemplate` in Content Registry (content data)
+  - Removed `leadsToNextFloor` from Dungeon System (derived from `currentFloor < 5`)
+  - Removed `warningText` from Dungeon System (load from `DungeonTemplate.thresholdWarning`)
+  - Aligned `Direction` to 4 cardinal values (floor transitions use `descendFloor()` API, not room connections)
 
-### 5) ~~Dread equipment modifiers have no state input path~~ ✅ RESOLVED
-- **Resolution**: Removed equipment-based Dread modifiers from MVP scope. The feature was over-engineered for minimal gameplay value. Core Dread management (torch, consumables, rest, shrines, extraction) is sufficient.
-- **Changes made**:
-  - `docs/architecture/09-dread-system.md`: Removed `CharacterService` dependency, simplified factory function, removed `equipmentDreadReduction` from internal state
-  - Added "Future Enhancements" section documenting how to add equipment modifiers later if needed
+### 3) ~~Combat types diverge across modules~~ (RESOLVED)
+- Issue: 08-combat redefines `CombatPlayerState` while claiming it imports it, and `DamageBreakdown` fields differ from state/event definitions.
+- Impact: Type drift and incompatible payloads between combat, state, and event logs.
+- Relevant files:
+  - docs/architecture/03-state-management.md
+  - docs/architecture/08-combat-system.md
+- **Resolution:** Distinguished input types from state types:
+  - Renamed `CombatPlayerState` in 08-combat to `CombatEngineParams` (it's engine initialization input, not stored state). Added clarifying comment.
+  - Added `slowEnemyBonus` and `blockReduction` to canonical `DamageBreakdown` in 03-state (they belong in combat logs for UI display).
+  - Removed duplicate `DamageBreakdown`, `CombatLogEntry`, `CombatLogDetails` definitions from 08-combat; these are now imported from 03-state.
+  - Updated public exports to reflect correct type ownership.
 
-### 6) ~~CLI integration inconsistencies~~ ✅ RESOLVED
-- **Resolution**: Fixed naming inconsistency (`dungeon_exploration` → `dungeon_exploring`) and API mismatch (`subscribe('*')` → `subscribeAll()`).
-- **Changes made**:
-  - `docs/architecture/15-cli-presentation.md`: Changed `dungeon_exploration` to `dungeon_exploring` in ScreenType
-  - `docs/architecture/15-cli-presentation.md`: Changed `subscribe('*', ...)` to `subscribeAll(...)` in main loop example
+### 4) ~~`MOVE_BACK` command lacks target~~ (RESOLVED)
+- Issue: Command has no `roomId`, but navigation requires a target room to backtrack.
+- Impact: Command cannot be executed deterministically without extra state.
+- Relevant files:
+  - docs/architecture/05-command-system.md
+  - docs/architecture/10-dungeon-system.md
+- **Resolution:** Added `roomId: string` to `MoveBackCommand` interface. This matches the existing `backtrackToRoom(targetRoomId)` API and preserves backtracking as a tactical choice (jump to any cleared room for 1-turn cost). CLI will present cleared rooms as numbered options.
 
-### 7) ~~Circular dependency between state-management and item-system~~ ✅ RESOLVED
-- **Issue**: `03-state-management` declared dependency on `07-item-system` for `ItemInstance`, while `07-item-system` APIs use `InventoryState`, `EquipmentState`, `StashState` from `03-state-management`. This circular dependency broke module ordering and made the dependency graph ambiguous.
-- **References**:
-  - `docs/architecture/03-state-management.md:19` (original dependency declaration)
-  - `docs/architecture/07-item-system.md:392` (InventoryService using InventoryState)
-- **Resolution**: State Management owns all state shapes. `ItemInstance` and `ItemSource` are now canonical types defined in `03-state-management`. Item System imports these types from State Management, creating a clean one-way dependency: `01 → 03 → 07`.
-- **Changes made**:
-  - `docs/architecture/03-state-management.md`: Removed dependency on `07-item-system`, added canonical `ItemInstance` definition with full documentation, added `ItemInstance` to public exports
-  - `docs/architecture/07-item-system.md`: Added `03-state-management` to dependencies, replaced `ItemInstance`/`ItemSource` definitions with import reference, updated public exports to re-export from state module
+### 5) ~~Extraction depends on undefined `DungeonService`~~ (RESOLVED)
+- Issue: Extraction factory requires `DungeonService` but dungeon module only defines generator/navigation managers.
+- Impact: Undefined API boundary; extraction can't query the "next room" reliably.
+- Relevant files:
+  - docs/architecture/10-dungeon-system.md
+  - docs/architecture/11-extraction-system.md
+- **Resolution:** Replaced `dungeonService: DungeonService` with `dungeonSystem: DungeonSystem` in the factory function. The existing `DungeonSystem` facade already provides `navigation.getNavigationOptions()` and `roomState.getRoomById()` which is everything Extraction needs for Taunt generation. No new interface required.
 
-### 8) ~~"Brought" items tracking references wrong state and field name~~ ✅ RESOLVED
-- **Issue**: Documentation comments referenced non-existent `CharacterState.broughtItemIds`, but the actual canonical field is `SessionState.broughtItems`. This naming/location mismatch would mislead death-economy implementation.
-- **References**:
-  - `docs/architecture/03-state-management.md:184` (incorrect reference in ItemSource comment)
-  - `docs/architecture/07-item-system.md:66,71` (incorrect reference in ItemRiskStatus comment)
-  - `docs/architecture/03-state-management.md:345` (actual canonical field)
-- **Resolution**: "Brought" items are run-scoped, so `SessionState.broughtItems` is the correct canonical location. Updated all documentation comments to reference the correct state object and field name.
-- **Changes made**:
-  - `docs/architecture/03-state-management.md:184`: Changed `broughtItemIds in CharacterState` → `broughtItems in SessionState`
-  - `docs/architecture/07-item-system.md:66`: Changed `broughtItemIds.includes(id)` → `SessionState.broughtItems.includes(id)`
-  - `docs/architecture/07-item-system.md:71`: Changed `CharacterState.broughtItemIds` → `SessionState.broughtItems`
+### 6) ~~Death economy duplicated across Item and Extraction~~ (RESOLVED)
+- Issue: Both ItemSystem and Extraction define overlapping death outcomes with different reason enums.
+- Impact: Risk of double-processing or inconsistent results.
+- Relevant files:
+  - docs/architecture/07-item-system.md
+  - docs/architecture/11-extraction-system.md
+- **Resolution:** Simplified death economy to "full loss on death" - all items in dungeon are lost, only stash is safe. This eliminates the complex survival rules (equipped+identified, brought from stash, etc.) that caused the duplication. Benefits:
+  - Strengthens extraction dilemma (every item at risk creates visceral tension)
+  - Eliminates overlapping type definitions (no reason enums needed)
+  - Simple two-state risk system: `safe` (in stash) vs `at_risk` (in dungeon)
+  - Death processing becomes trivial: collect all items → mark as lost
+  - Game design precedent: Spelunky, FTL, Into the Breach all use full loss successfully
 
-### 9) ~~createInitialState parameter mismatch in camp tests~~ ✅ RESOLVED
-- **Issue**: `createInitialState` in state-management requires 4 parameters (profileName, playerType, classId, registry), but camp system property tests called it with no arguments.
-- **References**:
-  - `docs/architecture/03-state-management.md:935` (canonical signature with required params)
-  - `docs/architecture/12-camp-system.md:1105` (tests calling with no params)
-- **Resolution**: Added test fixture factory `createTestState()` in camp system property tests that wraps `createInitialState` with sensible defaults. This follows standard testing practice—production API remains strict while tests have convenient fixtures.
-- **Changes made**:
-  - `docs/architecture/12-camp-system.md`: Added `createTestState()` fixture factory before property tests, updated all 4 property test calls to use `createTestState()` instead of `createInitialState()`
+### 7) ~~Veteran Knowledge updates can double-apply~~ (RESOLVED)
+- Issue: KnowledgeService subscribes to combat events, while Extraction's death result also includes VeteranKnowledge updates.
+- Impact: On death, knowledge could be applied twice.
+- Relevant files:
+  - docs/architecture/06-character-system.md
+  - docs/architecture/11-extraction-system.md
+- **Resolution:** Established KnowledgeService as the SINGLE OWNER of all VeteranKnowledge state mutations:
+  - Removed `veteranKnowledgeUpdates` field from `DeathResult` interface in 11-extraction-system
+  - Removed `VeteranKnowledgeUpdate` type definition from 11-extraction-system (owned by KnowledgeService)
+  - Updated `processPlayerDeath` implementation to not call knowledge updates
+  - Added explicit "SINGLE OWNER" documentation to KnowledgeService interface
+  - All knowledge updates now flow exclusively through KnowledgeService event subscriptions (COMBAT_STARTED, ENEMY_KILLED, PLAYER_KILLED)
 
-### 10) ~~CombatPhase deprecated but Agent Mode still exposes it~~ ✅ RESOLVED
-- **Issue**: `CombatPhase` is deprecated in foundation (use `TurnPhase` from state-management), but Agent Mode's `AgentCombatState.phase` still used the deprecated type. This creates API inconsistency between internal state (TurnPhase with 7 granular values) and agent-facing API (CombatPhase with 3 coarse values).
-- **References**:
-  - `docs/architecture/01-foundation.md:63` (@deprecated annotation)
-  - `docs/architecture/16-agent-mode.md:440` (AgentCombatState.phase using CombatPhase)
-- **Resolution**: Updated `AgentCombatState.phase` to use `TurnPhase` instead of deprecated `CombatPhase`. This aligns with Agent Mode's design principle ("Same game core, different output format") and the existing dependency on 03-state-management. The granular phases give AI agents precise combat state information, while the existing `player_acted: boolean` field provides simplified "can I act?" semantics.
-- **Changes made**:
-  - `docs/architecture/16-agent-mode.md`: Changed `phase: CombatPhase` to `phase: TurnPhase` with documentation reference
+### 8) ~~Item risk status API missing context + Agent mode mismatch~~ (RESOLVED)
+- Issue: `getRiskStatus` cannot mark `at_risk` without brought-item context. Agent mode labels brought items as `doomed` instead of `at_risk`.
+- Impact: UI/agent outputs can't reflect death economy correctly.
+- Relevant files:
+  - docs/architecture/07-item-system.md
+  - docs/architecture/16-agent-mode.md
+- **Resolution:** Simplified `ItemRiskStatus` to two states as part of "full loss on death" design change:
+  - `safe`: Item is in stash (at camp)
+  - `at_risk`: Item is in dungeon (equipped, carried, or brought - all treated equally)
+  - No need for `broughtFromStash` context since all items in dungeon are lost on death
+  - Agent mode can simply use: stash items = `safe`, dungeon items = `at_risk`
 
-### 11) ~~ProfileManager API uses ambiguous profileName parameter~~ ✅ RESOLVED
-- **Issue**: `ProfileManager.createProfile` takes `ProfileState`, but other methods use `profileName: string`. `ProfileState` had both `id` and `name` fields, with no documented mapping to filesystem directories. This made it unclear what `profileName` parameters referred to and how directory naming/validation worked.
-- **References**:
-  - `docs/architecture/13-save-system.md:48` (createProfile takes ProfileState)
-  - `docs/architecture/13-save-system.md:63` (loadProfile uses profileName)
-  - `docs/architecture/03-state-management.md:87` (ProfileState with id and name)
-- **Resolution**: Adopted **Single Identifier Model**: profile `name` is both the display name AND the filesystem directory name. Removed separate `id` field from `ProfileState`. All `profileName` parameters refer to `ProfileState.name`. Validation against `profileNameRules` happens in `ProfileManager.createProfile()`.
-- **Trade-off**: Display names limited to filesystem-safe characters (alphanumeric, dash, underscore), but this eliminates mapping complexity and an entire class of sync/lookup bugs.
-- **Changes made**:
-  - `docs/architecture/03-state-management.md`: Removed `id` field from `ProfileState`, added documentation explaining single identifier model, updated `createProfileState` to document validation responsibility
-  - `docs/architecture/13-save-system.md`: Added identifier convention documentation to `ProfileManager` interface, clarified all method parameters refer to `ProfileState.name`, documented validation behavior in `createProfile`
+### 9) ~~CLI dependencies reference non-existent types~~ (RESOLVED)
+- Issue: CLI lists `DerivedState` under Character and `ProfileInfo` under Save, but canonical types are elsewhere.
+- Impact: Minor confusion; not blocking but causes implementation churn.
+- Relevant files:
+  - docs/architecture/15-cli-presentation.md
+  - docs/architecture/03-state-management.md
+  - docs/architecture/13-save-system.md
+- **Resolution:** Updated CLI dependencies section:
+  - Changed `DerivedState` import from `06-character-system` to `03-state-management` (where it's canonically defined)
+  - Changed `ProfileInfo` to `ProfileMetadata` to match the actual type name in `13-save-system`
 
-### 12) ~~Missing ContentRegistry dependency in state-management~~ ✅ RESOLVED
-- **Issue**: `03-state-management` uses `ContentRegistry` in state factory functions (`createProfileState`, `createInitialState`, `createCharacterState`) but doesn't list `02-content-registry` as a dependency. This breaks the dependency graph and makes the module contract unclear.
-- **References**:
-  - `docs/architecture/03-state-management.md:19` (dependencies section)
-  - `docs/architecture/03-state-management.md:941` (ContentRegistry parameter in createProfileState)
-  - `docs/architecture/02-content-registry.md:34` (ContentRegistry definition)
-- **Resolution**: Added `02-content-registry` to the dependencies list, documenting its use for class definitions in state factory functions.
-- **Changes made**:
-  - `docs/architecture/03-state-management.md`: Added `02-content-registry: ContentRegistry` to Dependencies section
+### 10) ~~Dependency matrix and naming drift~~ (RESOLVED)
+- Issue: Overview dependency matrix lists State depends only on Foundation, but state doc includes Content Registry. Commands use `profileId` while Save system uses `profileName`.
+- Impact: Minor spec inconsistency.
+- Relevant files:
+  - docs/architecture/00-overview.md
+  - docs/architecture/03-state-management.md
+  - docs/architecture/05-command-system.md
+  - docs/architecture/13-save-system.md
+- **Resolution:** Applied two fixes:
+  - Updated dependency matrix in 00-overview.md: State Management (03) now correctly shows dependencies `01, 02` (was `01`)
+  - Renamed `profileId` to `profileName` in 05-command-system.md for `LoadGameCommand` and `DeleteProfileCommand` to match Save System convention and the documented identifier model where `ProfileState.name` serves as both display name and filesystem directory name
+
+### 11) ~~MOVE_BACK command lacks target in CLI/Agent docs~~ (RESOLVED)
+- Issue: `MoveBackCommand` requires `roomId` (05-command-system:345), but CLI shortcut `"back": "MOVE_BACK"` (15-cli-presentation:1019) and Agent pattern `move back` (16-agent-mode:1175) provide no mechanism to specify the target room.
+- Impact: Commands cannot be executed deterministically—no way to provide the required roomId.
+- Relevant files:
+  - docs/architecture/05-command-system.md
+  - docs/architecture/15-cli-presentation.md
+  - docs/architecture/16-agent-mode.md
+- **Resolution:** Aligned CLI and Agent mode with the Command System's requirement:
+  - **CLI (15):** Changed `"back": "MOVE_BACK"` to `"back": "SHOW_BACKTRACK_MENU"` for two-step selection. Added `"back <n>": "MOVE_BACK"` for direct selection. Added `BacktrackMenuRenderer` interface and `BacktrackOption` type to support menu-driven selection of cleared rooms.
+  - **Agent Mode (16):** Changed `move back` pattern to `move back <room_id>` (e.g., `move back room_abc123`). Agents have full state access and can query cleared rooms directly.
+
+### 12) ~~Death event schemas not aligned with full-loss design~~ (RESOLVED)
+- Issue: `ItemsLostEvent` requires a `reason` field (`'brought' | 'unidentified' | 'carried'`) and `ItemsPreservedEvent` still exists, but `DeathResult` only returns `LostItemInfo[]` without reasons. Event contracts cannot be satisfied.
+- Impact: Extraction system cannot emit valid death events; event consumers expect data that doesn't exist.
+- Relevant files:
+  - docs/architecture/04-event-system.md
+  - docs/architecture/11-extraction-system.md
+  - docs/architecture/07-item-system.md
+- **Resolution:** Simplified death events to match "full loss on death" design (Finding #6):
+  - **ItemsLostEvent:** Removed `reason` field. All items in dungeon are lost equally—no distinction needed. Event payload now matches `LostItemInfo` structure from Item System.
+  - **ItemsPreservedEvent:** Removed entirely. With full loss on death, no items are preserved from dungeon. Stash items were never at risk during a run, so no preservation event needed.
+  - This aligns event schemas with `DeathResult.itemsLost: LostItemInfo[]` and eliminates the contract mismatch.
+
+### 13) ~~processDeathLoss returns goldLost without gold input~~ (RESOLVED)
+- Issue: `processDeathLoss` returns `goldLost: number` in `DeathLossResult`, but the function signature only accepts `equipment` and `inventory`—no gold parameter. The function cannot compute `goldLost` without knowing how much gold was collected.
+- Impact: Function contract cannot be satisfied; implementation would need to either hardcode 0 or access state illegally.
+- Relevant files:
+  - docs/architecture/07-item-system.md
+  - docs/architecture/03-state-management.md
+- **Resolution:** Added `goldCollected: number` parameter to `processDeathLoss`. This is the run gold from `SessionState.goldCollected` that gets lost on death. Persistent gold at camp (`ProfileState.gold`) is never at risk.
+
+### 14) ~~Risk status literals still use 'doomed' in camp/agent views~~ (RESOLVED)
+- Issue: `BringItemView.riskStatus` in Camp System and `AgentBroughtItem.risk_status` in Agent Mode used `'doomed'` literal, but canonical `ItemRiskStatus` was simplified to `'safe' | 'at_risk'` in Finding #8.
+- Impact: Type inconsistency—views cannot satisfy `ItemRiskStatus` union.
+- Relevant files:
+  - docs/architecture/07-item-system.md
+  - docs/architecture/12-camp-system.md
+  - docs/architecture/16-agent-mode.md
+- **Resolution:** Replaced `'doomed'` with `'at_risk'` in both `BringItemView` (12-camp-system) and `AgentBroughtItem` (16-agent-mode). Items brought into dungeon share the same risk status as all other dungeon items—the "full loss on death" design eliminates the need for a distinct `'doomed'` state.

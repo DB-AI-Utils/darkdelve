@@ -344,6 +344,7 @@ interface MoveToRoomCommand {
 
 interface MoveBackCommand {
   type: 'MOVE_BACK';
+  roomId: string;
 }
 
 // ==================== Combat Commands ====================
@@ -491,7 +492,7 @@ interface SaveGameCommand {
 
 interface LoadGameCommand {
   type: 'LOAD_GAME';
-  profileId: string;
+  profileName: string;
 }
 
 interface CreateProfileCommand {
@@ -503,7 +504,7 @@ interface CreateProfileCommand {
 
 interface DeleteProfileCommand {
   type: 'DELETE_PROFILE';
-  profileId: string;
+  profileName: string;
   confirmed: boolean;
 }
 

@@ -199,13 +199,30 @@ interface UserService {
 
 ## What Architecture Documents MUST NOT Include
 
+**NO IMPLEMENTATION CODE. PERIOD.**
+
+The ONLY code allowed is TypeScript interface definitions. Everything else is the engineer's job.
+
 | DO NOT Include | Why | Engineer's Job |
 |----------------|-----|----------------|
 | Folder/file structure | Implementation detail | Engineer decides based on patterns |
 | Specific library versions | Changes frequently | Engineer evaluates options |
 | Exact database schemas | Too detailed | Engineer designs from interfaces |
-| Code beyond interfaces | You're architecting, not coding | Engineer implements |
+| Function implementations | You're architecting, not coding | Engineer implements |
+| Utility/helper functions | Implementation detail | Engineer creates as needed |
 | Specific cloud service names without alternatives | Vendor lock-in decision | Present options instead |
+
+**NO REDUNDANT COMMENTS.**
+
+Do not add comments that restate what the code already says. Field names should be self-explanatory.
+
+| BAD | WHY |
+|-----|-----|
+| `/** Whether the user is active */ readonly isActive: boolean;` | The name says it all |
+| `/** The user's email address */ readonly email: string;` | Obvious from name |
+| `/** Set to true when boss is defeated */ readonly defeated: boolean;` | Redundant |
+
+Only add comments when the meaning is genuinely non-obvious or there's important context the name can't convey.
 
 ## Red Flags in Your Output
 
@@ -217,6 +234,9 @@ interface UserService {
 | "Use PostgreSQL" (without alternatives) | Single option | Present PostgreSQL vs alternatives with trade-offs |
 | Detailed retry logic | Too detailed | "Module handles retries per X policy" |
 | Rate limit numbers | Implementation tuning | "Rate limiting required, values TBD by engineer" |
+| `function doSomething() { ... }` | Implementation code | Only interfaces allowed |
+| `/** Returns true if X */ isX: boolean` | Redundant comment | Let the name speak for itself |
+| Helper/utility functions | Implementation detail | Document the concept, not the code |
 
 ## Anti-Patterns
 
@@ -292,6 +312,8 @@ Before delivering architecture document, verify:
 - [ ] Defined module boundaries with clear ownership
 - [ ] Specified interfaces (not implementations)
 - [ ] NO folder structures or file names
-- [ ] NO implementation details beyond interfaces
+- [ ] NO implementation code (only interfaces)
+- [ ] NO function bodies or utility implementations
+- [ ] NO redundant comments that restate field names
 - [ ] Marked decision points for engineers/stakeholders
 - [ ] Listed open questions

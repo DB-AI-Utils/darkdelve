@@ -98,7 +98,7 @@ function createCombatEngine(
   contentRegistry: ContentRegistry,
   eventBus: EventBus,
   rng: SeededRNG,
-  playerState: CombatPlayerState,
+  playerParams: CombatEngineParams,
   lessonLearned: LessonLearnedState | null
 ): CombatEngine;
 ```
@@ -113,6 +113,7 @@ function createCombatEngine(
 //   - PlayerCombatState, EnemyCombatState
 //   - CombatActionType, CombatAction
 //   - ActiveStatusEffect
+//   - DamageBreakdown, CombatLogEntry, CombatLogDetails
 //
 // Combat system extends PlayerCombatState with computed fields:
 
@@ -127,9 +128,13 @@ interface CombatPlayerStateExtended extends PlayerCombatState {
   readonly armor: number;
 }
 
-// ==================== Combat Initialization Input ====================
+// ==================== Combat Engine Initialization ====================
+//
+// CombatEngineParams is the INPUT for creating a combat engine.
+// This is NOT the same as PlayerCombatState (which is runtime state).
+// CombatEngineParams provides character data needed to initialize combat.
 
-interface CombatPlayerState {
+interface CombatEngineParams {
   /** Current HP at combat start */
   currentHP: number;
 
@@ -309,18 +314,10 @@ interface DamageResult {
   breakdown: DamageBreakdown;
 }
 
-interface DamageBreakdown {
-  readonly baseDamage: number;
-  readonly mightBonus: number;
-  readonly skillMultiplier: number;
-  readonly bonusPercent: number;
-  readonly critMultiplier: number;
-  readonly armorReduction: number;
-  readonly lessonLearnedBonus: number;
-  readonly slowEnemyBonus: number;
-  readonly blockReduction: number;
-  readonly finalDamage: number;
-}
+// DamageBreakdown imported from 03-state-management (canonical definition)
+// Includes: baseDamage, mightBonus, skillMultiplier, bonusPercent,
+// critMultiplier, armorReduction, lessonLearnedBonus, slowEnemyBonus,
+// blockReduction, finalDamage
 
 /**
  * Create damage calculator instance
@@ -682,36 +679,9 @@ interface TurnStartResult {
 }
 
 // ==================== Combat Log ====================
-
-interface CombatLogEntry {
-  /** Turn when this happened */
-  readonly turn: number;
-
-  /** Timestamp */
-  readonly timestamp: Timestamp;
-
-  /** Who performed the action */
-  readonly actor: 'player' | 'enemy' | 'system';
-
-  /** Action description */
-  readonly action: string;
-
-  /** Detailed data */
-  readonly details: CombatLogDetails;
-}
-
-interface CombatLogDetails {
-  readonly damage?: number;
-  readonly healing?: number;
-  readonly critical?: boolean;
-  readonly blocked?: boolean;
-  readonly dodged?: boolean;
-  readonly missed?: boolean;
-  readonly staggered?: boolean;
-  readonly statusApplied?: string;
-  readonly statusRemoved?: string;
-  readonly damageBreakdown?: DamageBreakdown;
-}
+//
+// CombatLogEntry and CombatLogDetails imported from 03-state-management.
+// See canonical definitions there for full interface contracts.
 ```
 
 ### Flee Mechanics
@@ -1298,14 +1268,20 @@ export type {
   // Engine
   CombatEngine,
 
-  // State
+  // State (re-exported from 03-state-management for convenience)
   CombatState,
   TurnPhase,
   TurnOrder,
   PlayerCombatState,
-  CombatPlayerState,
   EnemyCombatState,
   ActiveStatusEffect,
+  DamageBreakdown,
+  CombatLogEntry,
+  CombatLogDetails,
+
+  // Combat-specific types
+  CombatEngineParams,
+  CombatPlayerStateExtended,
 
   // Actions
   CombatAction,
@@ -1318,7 +1294,6 @@ export type {
   PlayerDamageParams,
   EnemyDamageParams,
   DamageResult,
-  DamageBreakdown,
 
   // Stamina
   StaminaManager,
@@ -1344,8 +1319,6 @@ export type {
   CombatActionData,
   CombatOutcome,
   TurnStartResult,
-  CombatLogEntry,
-  CombatLogDetails,
 
   // Flee
   FleeResolver,

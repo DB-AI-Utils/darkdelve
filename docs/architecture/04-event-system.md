@@ -556,6 +556,8 @@ interface DeathOccurredEvent {
   dreadAtDeath: number;
 }
 
+// Full loss on death: all items in dungeon are lost equally.
+// No reason needed - matches LostItemInfo from Item System (07).
 interface ItemsLostEvent {
   type: 'ITEMS_LOST';
   timestamp: Timestamp;
@@ -563,20 +565,11 @@ interface ItemsLostEvent {
     itemId: EntityId;
     templateId: string;
     itemName: string;
-    reason: 'brought' | 'unidentified' | 'carried';
   }>;
 }
 
-interface ItemsPreservedEvent {
-  type: 'ITEMS_PRESERVED';
-  timestamp: Timestamp;
-  items: Array<{
-    itemId: EntityId;
-    templateId: string;
-    itemName: string;
-    returnedTo: 'stash';
-  }>;
-}
+// NOTE: ItemsPreservedEvent removed. With full loss on death, no items
+// are preserved from dungeon. Stash items are never at risk during a run.
 
 // ==================== Event Room Events ====================
 
@@ -752,7 +745,6 @@ type GameEvent =
   // Death
   | DeathOccurredEvent
   | ItemsLostEvent
-  | ItemsPreservedEvent
 
   // Events
   | EventStartedEvent
@@ -980,7 +972,6 @@ export type {
   ExtractionTauntEvent,
   DeathOccurredEvent,
   ItemsLostEvent,
-  ItemsPreservedEvent,
   EventStartedEvent,
   EventChoiceMadeEvent,
   EventOutcomeEvent,

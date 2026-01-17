@@ -453,6 +453,7 @@ interface CombatRoomContents {
   readonly type: 'combat';
   readonly enemyTemplateId: string;
   readonly enemyInstanceId: EntityId;
+  readonly isElite: boolean;
   readonly defeated: boolean;
   readonly loot: readonly LootDropState[];
   readonly lootCollected: boolean;
@@ -502,6 +503,7 @@ interface BossRoomContents {
   readonly defeated: boolean;
   readonly loot: readonly LootDropState[];
   readonly lootCollected: boolean;
+  readonly exitUnlocked: boolean;
 }
 
 interface LootDropState {
@@ -696,6 +698,8 @@ interface DamageBreakdown {
   readonly critMultiplier: number;
   readonly armorReduction: number;
   readonly lessonLearnedBonus: number;
+  readonly slowEnemyBonus: number;
+  readonly blockReduction: number;
   readonly finalDamage: number;
 }
 

@@ -680,7 +680,7 @@ interface BringItemView {
   templateId: string;
   name: string;
   rarity: Rarity;
-  riskStatus: 'doomed';
+  riskStatus: 'at_risk';
 }
 
 interface ConsumableSlotView {
@@ -970,7 +970,7 @@ type ChroniclerSection = 'bestiary' | 'lessons' | 'lore' | 'log';
 |------|----------|
 | Equip from full stash to non-empty slot | Swap items (unequip goes to stash) |
 | Unequip to full stash | Return `INSUFFICIENT_STASH_SPACE` error |
-| Unequip cursed item | Return `ITEM_CURSED` error (unless Hollowed One) |
+| Unequip cursed item | Return `ITEM_CURSED` error |
 | Drop quest item | Block with warning "Quest items cannot be destroyed" |
 | Drop last weapon | Block - weapon slot cannot be empty |
 | Sort empty stash | No-op, return unchanged state |

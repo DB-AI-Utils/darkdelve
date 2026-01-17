@@ -177,14 +177,13 @@ This means "+50% loot quality at max Dread" translates to a 50% chance for any d
 - Reveals true stats and effects
 - Enables selling at full value (unidentified = 50% value)
 - Required to equip items with active abilities
-- Protects EQUIPPED items from death loss (see [Death Economy](death-discovery.md))
+- Reveals curses before equipping
 
 **What Identification Does NOT Do:**
-- Protect CARRIED (unequipped) items from death loss
+- Protect items from death loss (all items lost on death regardless of identification)
 - Transfer items directly to stash
-- Make items "safe" if they were BROUGHT from stash
 
-**Key Rule:** Identification only protects items you are WEARING. If you identify an item but keep it in your carried inventory (not equipped), it is still lost on death. This prevents "pay 25g for permanent item safety" exploits.
+**Note:** Identification is about *information*, not *safety*. You identify items to know what you have, sell at full value, and avoid curse surprises. Death protection comes from extracting successfully, not from identification.
 
 ---
 
@@ -300,7 +299,7 @@ MVP uses a fixed item pool of 20 items. All items are available from Level 1.
 |-------|------------------|-----------|
 | Mercenary | Default | Balanced, standard stats |
 | Flagellant | Extract while at 85+ Dread | High risk/reward, damage bonuses at low HP |
-| Hollowed One | Die to The Watcher on Floor 3+ | Can use cursed items safely, Dread manipulation |
+| Hollowed One | Die to The Watcher on Floor 3+ | Dread mastery, 20% reduced Dread gain |
 
 **Class Unlock Clarifications:**
 - **Flagellant:** Uses state tracking—Dread must be 85+ at the moment of extraction, not just at any point during the run. This prevents "spike to 85, reduce with potions, extract safely" cheese strategies.
@@ -327,17 +326,17 @@ MVP uses a fixed item pool of 20 items. All items are available from Level 1.
 
 ## The Stash System
 
-A permanent storage for items between runs, with risk/reward mechanics for bringing gear into dungeons.
+A permanent storage for items between runs. The stash is the ONLY safe place for items.
 
 ```
 +-------------------------------------------------------------+
 |  STASH (12 slots) - Items here are SAFE                     |
 |                                                             |
 |  Before Run: Select up to 2 items to BRING                  |
-|  -> Items brought are AT RISK                               |
+|  -> Items brought are AT RISK (like all items in dungeon)   |
 |                                                             |
-|  If you DIE:    Brought items LOST FOREVER                  |
-|  If you EXTRACT: Keep brought items + deposit found items   |
+|  If you DIE:    ALL items lost (equipped, carried, brought) |
+|  If you EXTRACT: Keep everything, deposit to stash          |
 +-------------------------------------------------------------+
 ```
 
@@ -351,10 +350,12 @@ A permanent storage for items between runs, with risk/reward mechanics for bring
 
 ### The Core Tension
 
-This creates "gear fear" — a meaningful pre-run decision:
+Full loss on death creates maximum "gear fear" — a meaningful pre-run decision:
 - Bring best gear → powerful run, but risk permanent loss
 - Bring nothing → weaker run, but no risk
 - Bring medium gear → balanced risk/reward
+
+The extraction dilemma intensifies: "I have my best sword equipped... do I push deeper or extract NOW?"
 
 **Red Flag to Watch:** If players NEVER bring items, loss is too painful — needs tuning.
 

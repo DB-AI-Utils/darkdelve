@@ -603,8 +603,8 @@ interface AgentConsumableSlot {
 interface AgentBroughtItem {
   id: EntityId;
   name: string;
-  /** Always 'doomed' - will be lost on death */
-  risk_status: 'doomed';
+  /** Always 'at_risk' - will be lost on death */
+  risk_status: 'at_risk';
 }
 
 // ==================== Camp State ====================
@@ -1172,7 +1172,7 @@ Agent commands are simple string commands. The format is:
 | Command | Pattern | Example |
 |---------|---------|---------|
 | Move to room | `move <direction>` | `move north` |
-| Move back | `move back` | `move back` |
+| Move back | `move back <room_id>` | `move back room_abc123` |
 
 ### Combat Commands
 

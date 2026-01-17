@@ -187,7 +187,7 @@ Modules must be implemented in dependency order. Each phase builds on the previo
 |--------|------------|
 | 01-Foundation | (none) |
 | 02-Content Registry | 01 |
-| 03-State Management | 01 |
+| 03-State Management | 01, 02 |
 | 04-Event System | 01 |
 | 05-Command System | 01, 03, 04 |
 | 06-Character | 01, 02, 03, 05 |

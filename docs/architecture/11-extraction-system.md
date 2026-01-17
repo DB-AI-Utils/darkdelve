@@ -25,10 +25,10 @@ Manages the core gameplay loop of DARKDELVE: the extraction dilemma. This module
 
 - **01-foundation**: Types (`FloorNumber`, `EntityId`, `Rarity`, `RoomType`), `Result`, `SeededRNG`
 - **02-content-registry**: `ExtractionConfig`, loot table access for Taunt generation
-- **04-event-system**: Event emission (`EXTRACTION_*`, `ITEMS_LOST`, `ITEMS_PRESERVED`, `LESSON_LEARNED_*`)
+- **04-event-system**: Event emission (`EXTRACTION_*`, `ITEMS_LOST`, `LESSON_LEARNED_*`)
 - **07-item-system**: `ItemInstance`, `ItemSource`, `ItemRiskStatus`, inventory/stash operations
 - **09-dread-system**: `DreadManager` for extraction blocking (Watcher) and desperation Dread cost
-- **10-dungeon-system**: Current floor, next room data for Taunt
+- **10-dungeon-system**: `DungeonSystem` (facade providing navigation and room state for Taunt generation)
 
 ---
 
@@ -353,39 +353,28 @@ interface RunStats {
 ```typescript
 // ==================== Death Economy ====================
 
+/**
+ * Death Economy follows a simple rule: FULL LOSS ON DEATH.
+ * All items in the dungeon (equipped, carried, brought) are lost.
+ * Only the stash (at camp) is safe.
+ *
+ * This simplification strengthens the extraction dilemma and
+ * eliminates complex survival rule processing.
+ */
 interface DeathEconomyService {
   /**
-   * Process death and determine item outcomes
-   * Applies the death item resolution priority
+   * Process death: all items lost, grant Lesson Learned.
+   * Delegates item loss to ItemSystem's StashService.
    */
   processPlayerDeath(params: DeathParams): DeathResult;
-
-  /**
-   * Calculate which items would be lost/preserved
-   * (Preview without actually processing)
-   */
-  previewDeathOutcome(params: DeathParams): DeathPreview;
-
-  /**
-   * Get item's death risk status.
-   * broughtFromStash is determined by checking broughtItemIds.
-   */
-  getItemDeathRisk(
-    item: ItemInstance,
-    isEquipped: boolean,
-    broughtFromStash: boolean
-  ): ItemRiskStatus;
 }
 
 interface DeathParams {
   /** Items currently equipped */
-  equippedItems: readonly EquippedItemInfo[];
+  equippedItems: readonly ItemInstance[];
 
   /** Items in carried inventory (not equipped) */
   carriedItems: readonly ItemInstance[];
-
-  /** IDs of items brought from stash this run */
-  broughtItemIds: readonly EntityId[];
 
   /** Gold carried */
   carriedGold: number;
@@ -400,11 +389,6 @@ interface DeathParams {
   floor: FloorNumber;
 }
 
-interface EquippedItemInfo {
-  item: ItemInstance;
-  slot: EquipmentSlot;
-}
-
 interface KilledByInfo {
   enemyId: string;
   enemyName: string;
@@ -412,11 +396,8 @@ interface KilledByInfo {
 }
 
 interface DeathResult {
-  /** Items lost forever */
-  itemsLost: LostItemDetail[];
-
-  /** Items preserved to stash */
-  itemsPreserved: PreservedItemDetail[];
+  /** All items lost (full loss on death) */
+  itemsLost: LostItemInfo[];
 
   /** Gold lost */
   goldLost: number;
@@ -424,52 +405,24 @@ interface DeathResult {
   /** Lesson Learned granted */
   lessonLearned: LessonLearnedInfo;
 
-  /** Veteran Knowledge progress updates */
-  veteranKnowledgeUpdates: VeteranKnowledgeUpdate[];
-
   /** Death summary for display */
   summary: DeathSummary;
 }
 
-interface DeathPreview {
-  itemsWouldLose: LostItemDetail[];
-  itemsWouldPreserve: PreservedItemDetail[];
-  goldWouldLose: number;
-}
+// NOTE: Veteran Knowledge updates are NOT included in DeathResult.
+// KnowledgeService (06-character-system) is the single owner of all
+// VeteranKnowledge state mutations. It subscribes to PLAYER_KILLED
+// events and handles death-based knowledge updates independently.
+// This prevents double-application of knowledge updates.
 
-interface LostItemDetail {
-  itemId: EntityId;
-  templateId: string;
-  displayName: string;
-  reason: LostItemReason;
-  wasIdentified: boolean;
-  wasEquipped: boolean;
-}
-
-type LostItemReason =
-  | 'brought_from_stash'     // Priority 1: ALWAYS LOST
-  | 'equipped_unidentified'  // Priority 3: Equipped but not identified
-  | 'carried_identified'     // Priority 4: Not equipped (even if identified)
-  | 'carried_unidentified';  // Priority 4: Not equipped, not identified
-
-interface PreservedItemDetail {
-  itemId: EntityId;
-  templateId: string;
-  displayName: string;
-  reason: PreservedItemReason;
-  returnedTo: 'stash';
-}
-
-type PreservedItemReason =
-  | 'starting_gear'          // Class starting equipment - never lost
-  | 'equipped_identified';   // Priority 2: Equipped AND identified
-
-// ItemRiskStatus imported from 07-item-system (canonical definition)
-// See ItemService for type definition and status determination logic
+/**
+ * LostItemInfo imported from 07-item-system (canonical definition).
+ * Simple structure: itemId, templateId, displayName.
+ * No "reason" needed - all items are lost on death.
+ */
 
 interface DeathSummary {
   totalItemsLost: number;
-  totalItemsPreserved: number;
   goldLost: number;
   floor: FloorNumber;
   killedBy: string;
@@ -565,37 +518,33 @@ interface LessonLearnedDamageResult {
   enemyTypeMatched: string | null;
 }
 
-interface VeteranKnowledgeUpdate {
-  monsterId: string;
-  monsterName: string;
-  encounterCount: number;
-  deathCount: number;
-  tierUnlocked: 1 | 2 | 3 | null;
-}
+// VeteranKnowledgeUpdate is NOT defined here.
+// KnowledgeService (06-character-system) is the single owner of all
+// veteran knowledge types and state mutations.
 ```
 
 ### Factory Function
 
 ```typescript
 /**
- * Create extraction service instance
+ * Create extraction service instance.
+ * Uses DungeonSystem facade for next room queries (Taunt generation).
  */
 function createExtractionService(
   config: ExtractionConfig,
   eventBus: EventBus,
   itemService: ItemService,
   dreadManager: DreadManager,
-  dungeonService: DungeonService
+  dungeonSystem: DungeonSystem
 ): ExtractionService;
 
 /**
- * Create death economy service instance
+ * Create death economy service instance.
+ * Simple implementation: all items lost on death.
  */
 function createDeathEconomyService(
   config: DeathEconomyConfig,
-  eventBus: EventBus,
-  itemService: ItemService,
-  stashService: StashService
+  eventBus: EventBus
 ): DeathEconomyService;
 
 /**
@@ -684,49 +633,12 @@ function createLessonLearnedService(
 
 ```json
 {
-  "itemResolutionPriority": [
-    {
-      "priority": 1,
-      "condition": "brought_from_stash",
-      "outcome": "lost",
-      "description": "You risked it, you lost it."
-    },
-    {
-      "priority": 2,
-      "condition": "equipped_and_identified",
-      "outcome": "preserved",
-      "description": "You understood it, you keep it."
-    },
-    {
-      "priority": 3,
-      "condition": "equipped_and_unidentified",
-      "outcome": "lost",
-      "description": "You never truly knew what you held."
-    },
-    {
-      "priority": 4,
-      "condition": "carried_not_equipped",
-      "outcome": "lost",
-      "description": "Only what you wore survives the journey back."
-    },
-    {
-      "priority": 5,
-      "condition": "gold",
-      "outcome": "lost",
-      "description": "The dungeon claims its toll."
-    }
-  ],
-
-  "startingGearProtection": true,
-
-  "goldLossPercentage": 1.0,
+  "rule": "full_loss",
+  "description": "All items in dungeon lost on death. Only stash is safe.",
 
   "riskStatusTags": {
     "safe": { "color": "green", "description": "In stash, will not be lost" },
-    "at_risk": { "color": "red", "description": "Brought from stash, lost on death" },
-    "protected": { "color": "blue", "description": "Equipped + identified, survives death" },
-    "vulnerable": { "color": "yellow", "description": "Equipped but unidentified, lost on death" },
-    "doomed": { "color": "gray", "description": "Carried (not equipped), lost on death" }
+    "at_risk": { "color": "red", "description": "In dungeon, lost on death" }
   }
 }
 ```
@@ -845,7 +757,7 @@ interface DeathOccurredEvent {
 
 ### ITEMS_LOST
 
-Emitted with details of lost items.
+Emitted with details of lost items (all items in dungeon on death).
 
 ```typescript
 interface ItemsLostEvent {
@@ -855,25 +767,8 @@ interface ItemsLostEvent {
     itemId: EntityId;
     templateId: string;
     itemName: string;
-    reason: LostItemReason;
   }>;
-}
-```
-
-### ITEMS_PRESERVED
-
-Emitted with details of preserved items.
-
-```typescript
-interface ItemsPreservedEvent {
-  type: 'ITEMS_PRESERVED';
-  timestamp: Timestamp;
-  items: Array<{
-    itemId: EntityId;
-    templateId: string;
-    itemName: string;
-    returnedTo: 'stash';
-  }>;
+  goldLost: number;
 }
 ```
 
@@ -1005,13 +900,12 @@ interface PersistentPlayerState {
 
 | Case | Handling |
 |------|----------|
-| Equipped + Identified + Brought | Lost (brought overrides all) |
-| Starting gear | Always preserved (special case) |
-| Empty stash on preservation | Items still returned (stash can expand) |
-| Stash full on preservation | Warn player, items still preserved (expansion) |
-| Cursed equipped item | Same rules apply (equipped + ID = saved) |
-| Multiple items same priority | Process in acquisition order |
+| Any item in dungeon | Lost (full loss on death) |
+| Equipped items | Lost |
+| Carried items | Lost |
+| Brought from stash | Lost |
 | Gold at exactly 0 | No gold lost (nothing to lose) |
+| Stash items | Safe (stash is never affected by death) |
 
 ### Lesson Learned Edge Cases
 
@@ -1062,12 +956,11 @@ interface PersistentPlayerState {
    - Progress on Floor 5 lost
 
 4. **Death Economy Tests**
-   - Brought items always lost
-   - Equipped + ID preserved
-   - Equipped + unID lost
-   - Carried always lost (regardless of ID)
-   - Starting gear preserved
-   - Gold all lost
+   - All equipped items lost
+   - All carried items lost
+   - All brought items lost
+   - All gold lost
+   - Stash unchanged
 
 5. **Lesson Learned Tests**
    - Granted on death
@@ -1094,35 +987,31 @@ property("extraction cost >= minimum for Waystone floors", (gold: number, floor:
   return true;
 });
 
-property("brought items always lost on death", (items: ItemInstance[], broughtIds: EntityId[]) => {
+property("all items lost on death", (equippedItems: ItemInstance[], carriedItems: ItemInstance[]) => {
   const result = processPlayerDeath({
-    equippedItems: items.filter(i => broughtIds.includes(i.id)).map(i => ({ item: i, slot: 'weapon' })),
-    carriedItems: [],
-    broughtItemIds: broughtIds,
+    equippedItems,
+    carriedItems,
     carriedGold: 100,
     killedBy: mockEnemy,
     dreadAtDeath: 50,
     floor: 3,
   });
 
-  return broughtIds.every(id =>
-    result.itemsLost.some(lost => lost.itemId === id)
-  );
+  const totalItems = equippedItems.length + carriedItems.length;
+  return result.itemsLost.length === totalItems;
 });
 
-property("equipped + identified items preserved (unless brought)", (item: ItemInstance) => {
-  const itemIdentified = { ...item, identified: true, source: 'found' as const };
+property("all gold lost on death", (carriedGold: number) => {
   const result = processPlayerDeath({
-    equippedItems: [{ item: itemIdentified, slot: 'armor' }],
+    equippedItems: [],
     carriedItems: [],
-    broughtItemIds: [],
-    carriedGold: 100,
+    carriedGold,
     killedBy: mockEnemy,
     dreadAtDeath: 50,
     floor: 3,
   });
 
-  return result.itemsPreserved.some(p => p.itemId === item.id);
+  return result.goldLost === carriedGold;
 });
 
 property("lesson learned damage bonus is 10%", (baseDamage: number) => {
@@ -1154,9 +1043,10 @@ property("taunt never shows legendary", (roomContents: NextRoomContents) => {
 
 2. **Death Flow**
    - Die in combat -> Process death economy -> Grant lesson learned
-   - Verify correct items lost/preserved
-   - Verify gold lost
+   - Verify all items lost (full loss)
+   - Verify all gold lost
    - Verify lesson learned active next run
+   - Verify stash unchanged
 
 3. **Lesson Learned Flow**
    - Die to enemy -> Start new expedition -> Verify charge decremented
@@ -1203,89 +1093,44 @@ function executeExtraction(params: ExecuteExtractionParams): Result<ExtractionRe
 }
 ```
 
-### Death Economy Priority Resolution
+### Death Economy - Full Loss
 
-Items are processed strictly by priority:
+Death processing is simple: all items in the dungeon are lost.
 
 ```typescript
-function resolveDeathOutcome(params: DeathParams): DeathResult {
-  const itemsLost: LostItemDetail[] = [];
-  const itemsPreserved: PreservedItemDetail[] = [];
-
-  // Check each item against priority rules
-  for (const equipped of params.equippedItems) {
-    const item = equipped.item;
-
-    // Priority 1: Brought from stash -> ALWAYS LOST
-    if (params.broughtItemIds.includes(item.id)) {
-      itemsLost.push({
-        itemId: item.id,
-        templateId: item.templateId,
-        displayName: getDisplayName(item),
-        reason: 'brought_from_stash',
-        wasIdentified: item.identified,
-        wasEquipped: true,
-      });
-      continue;
-    }
-
-    // Special case: Starting gear -> ALWAYS PRESERVED
-    if (item.source === 'starting') {
-      itemsPreserved.push({
-        itemId: item.id,
-        templateId: item.templateId,
-        displayName: getDisplayName(item),
-        reason: 'starting_gear',
-        returnedTo: 'stash',
-      });
-      continue;
-    }
-
-    // Priority 2: Equipped + Identified -> PRESERVED
-    if (item.identified) {
-      itemsPreserved.push({
-        itemId: item.id,
-        templateId: item.templateId,
-        displayName: getDisplayName(item),
-        reason: 'equipped_identified',
-        returnedTo: 'stash',
-      });
-      continue;
-    }
-
-    // Priority 3: Equipped + Unidentified -> LOST
-    itemsLost.push({
+function processPlayerDeath(params: DeathParams): DeathResult {
+  // Full loss: all items in dungeon are lost
+  const itemsLost: LostItemInfo[] = [
+    ...params.equippedItems.map(item => ({
       itemId: item.id,
       templateId: item.templateId,
       displayName: getDisplayName(item),
-      reason: 'equipped_unidentified',
-      wasIdentified: false,
-      wasEquipped: true,
-    });
-  }
-
-  // Priority 4: Carried (not equipped) -> ALWAYS LOST
-  for (const item of params.carriedItems) {
-    itemsLost.push({
+    })),
+    ...params.carriedItems.map(item => ({
       itemId: item.id,
       templateId: item.templateId,
       displayName: getDisplayName(item),
-      reason: item.identified ? 'carried_identified' : 'carried_unidentified',
-      wasIdentified: item.identified,
-      wasEquipped: false,
-    });
-  }
+    })),
+  ];
 
-  // Priority 5: Gold -> ALL LOST
+  // All gold lost
   const goldLost = params.carriedGold;
+
+  // NOTE: Veteran Knowledge updates are handled by KnowledgeService
+  // listening to the PLAYER_KILLED event. We do NOT update knowledge here
+  // to avoid double-application.
 
   return {
     itemsLost,
-    itemsPreserved,
     goldLost,
     lessonLearned: grantLessonLearned(params.killedBy),
-    veteranKnowledgeUpdates: updateVeteranKnowledge(params.killedBy),
-    summary: createDeathSummary(itemsLost, itemsPreserved, goldLost, params),
+    summary: {
+      totalItemsLost: itemsLost.length,
+      goldLost,
+      floor: params.floor,
+      killedBy: params.killedBy.enemyName,
+      lessonLearnedGranted: true,
+    },
   };
 }
 ```
@@ -1437,7 +1282,6 @@ export type {
   CanRetreatParams,
   TauntParams,
   DeathParams,
-  EquippedItemInfo,
   KilledByInfo,
 
   // Result types
@@ -1452,17 +1296,13 @@ export type {
   NextRoomContents,
   RunStats,
   DeathResult,
-  DeathPreview,
-  LostItemDetail,
-  PreservedItemDetail,
-  LostItemReason,
-  PreservedItemReason,
-  // Note: ItemRiskStatus is imported from 07-item-system, not re-exported here
   DeathSummary,
+  // Note: ItemRiskStatus and LostItemInfo are imported from 07-item-system
   LessonLearnedInfo,
   LessonLearnedDecrementResult,
   LessonLearnedDamageResult,
-  VeteranKnowledgeUpdate,
+  // Note: VeteranKnowledgeUpdate is NOT exported here.
+  // KnowledgeService (06-character-system) owns all veteran knowledge types.
 
   // State types
   ExtractionState,
@@ -1495,16 +1335,17 @@ Every mechanic supports this tension:
 - **Death economy**: Items at risk creates real stakes
 - **Lesson Learned**: Death has value, softens the blow
 
-### Fairness in Loss
+### Fairness in Full Loss
 
 The death economy must feel FAIR:
-- Rules are explicit and consistent
-- Risk status is always visible
-- No hidden mechanics that steal items
-- Starting gear is protected
-- Identified + equipped = safe
+- Rule is explicit and simple: death = lose everything in dungeon
+- Risk status is binary and always visible: stash is safe, dungeon is risky
+- No hidden mechanics or edge cases
+- Player controls when to extract and end the risk
 
-When a player loses an item, they should think "I knew that would happen" not "that's unfair."
+When a player loses items, they should think "I pushed too far" not "the rules cheated me."
+
+Full loss actually strengthens fairness because there are no confusing survival rules to misunderstand.
 
 ### Lesson Learned as Consolation
 

@@ -370,7 +370,7 @@ interface DeathOccurredEvent extends AnalyticsEvent {
     combatTurn: number;
     /** Total damage taken this combat */
     totalDamageTaken: number;
-    /** Items lost (brought from stash) */
+    /** Items lost (all dungeon items) */
     itemsLost: string[];
     /** Gold lost */
     goldLost: number;

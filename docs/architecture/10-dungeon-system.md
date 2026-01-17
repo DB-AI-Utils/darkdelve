@@ -335,7 +335,7 @@ interface RoomPreview {
   enemyTypeHint?: EnemyType;
 }
 
-type Direction = 'north' | 'south' | 'east' | 'west' | 'up' | 'down';
+type Direction = 'north' | 'south' | 'east' | 'west';
 
 interface NavigationResult {
   /** Updated dungeon state */
@@ -477,9 +477,6 @@ interface StairwellRoomContents {
 
   /** Extraction cost (null if free) */
   readonly extractionCost: ExtractionCostState | null;
-
-  /** Whether this leads to next floor (vs exit) */
-  readonly leadsToNextFloor: boolean;
 }
 
 /**
@@ -493,9 +490,6 @@ interface ThresholdRoomContents {
 
   /** Whether boss is ready to fight */
   readonly bossReady: boolean;
-
-  /** Warning message about boss */
-  readonly warningText: string;
 }
 
 /**
@@ -519,7 +513,6 @@ interface BossRoomContents {
   /** Whether loot has been collected */
   readonly lootCollected: boolean;
 
-  /** Post-boss extraction available */
   readonly exitUnlocked: boolean;
 }
 
@@ -597,6 +590,15 @@ interface FloorLayout {
   connections: RoomConnection[];
 }
 ```
+
+### Derived Values
+
+The following values are **not stored in state** - they are derived or loaded on demand:
+
+| Value | Source | How to Obtain |
+|-------|--------|---------------|
+| Whether stairwell leads to next floor | Derived | `currentFloor < 5` |
+| Threshold warning text | Content | Load from `DungeonTemplate.thresholdWarning` via ContentRegistry |
 
 ### Factory Function
 
