@@ -51,13 +51,19 @@ Higher Dread increases unpredictability — the longer you stay, the wilder thin
 | Dread Level | Effect on Dungeon |
 |-------------|-------------------|
 | 0-25% | Standard variance, predictable runs |
-| 26-50% | Elite spawn chance increases (+10%) |
+| 26-50% | Elite spawn chance increases (see formula) |
 | 51-75% | New enemy variants appear, treasure quality increases |
 | 76-100% | "Twisted" room variants possible, maximum chaos + maximum reward |
 
 ### Concrete Numbers
 
-- Elite spawn chance: `5% base + (Dread% × 0.2)` = 5% at 0 Dread, 25% at 100 Dread
+**Elite spawn chance (floor-specific):**
+- Floor 1: 0% base (no elites)
+- Floors 2-3: 10% base
+- Floors 4-5: 15% base
+- Dread bonus: `+ (Dread% × 0.1)`, capped at +10%
+
+**Other Dread effects:**
 - Dangerous event weight: Equal weight (Dread-based weighting deferred to Phase 2)
 - Loot quality bonus: `+0% base + (Dread% × 0.5)` = +50% at max Dread
 
@@ -168,13 +174,15 @@ Room counts include the Stairwell room (represented as the [Exit] node in templa
 
 ### Room Type Distribution
 
-| Floor | Combat | Treasure | Event | Boss | Stairwell | Total |
-|-------|--------|----------|-------|------|-----------|-------|
-| 1 | 2 | 1 | 1 | 0 | 1 | 5 |
-| 2 | 2 | 1 | 1 | 0 | 1 | 5 |
-| 3 | 2 | 1 | 1 | 0 | 1 | 5 |
-| 4 | 2 | 1 | 1 | 0 | 1 | 5 |
-| 5 | 4 | 1 | 1 | 1 | 1 | 8 |
+| Floor | Combat | Treasure | Event | Waystone | Boss | Stairwell | Total |
+|-------|--------|----------|-------|----------|------|-----------|-------|
+| 1 | 2 | 1 | 1 | 0 | 0 | 1 | 5 |
+| 2 | 2 | 1 | 1 | 0 | 0 | 1 | 5 |
+| 3 | 2 | 1 | 0 | 1 | 0 | 1 | 5 |
+| 4 | 2 | 1 | 0 | 1 | 0 | 1 | 5 |
+| 5 | 4 | 1 | 1 | 0 | 1 | 1 | 8 |
+
+*Floors 3-4: Waystone Chamber replaces 1 Event room. Waystone spawns in position 5-8 (never first/last rooms).*
 
 ### Enemy Composition Pools
 

@@ -119,7 +119,7 @@ TOTAL CRIT CAP: 65% (from all sources combined)
 The XP targets in the Progression Metrics section (~740 XP for a standard run) are based on:
 - Combat rooms: 2 per floor on Floors 1-4, 4 on Floor 5 (Stairwell excluded)
 - Standard run (F1-4): ~10 combat encounters total
-- Elite spawn rate: 10-15% on Floors 3-4 (expect 1-2 elite encounters per standard run)
+- Elite base rate: 10% on Floors 2-3, 15% on Floor 4 (before Dread modifiers; expect 1-2 elite encounters per standard run)
 - These targets assume typical encounter distribution, not worst/best case scenarios
 
 **XP Multipliers by Floor:**
@@ -531,7 +531,7 @@ Use these metrics during playtesting:
 **D-003: XP Calculation Assumptions**
 - **Problem:** XP targets (~740 for standard run) lacked clear calculation methodology
 - **Resolution:** Added XP Calculation Assumptions documentation after XP Design Principle
-- Documents: ~60% combat rooms, ~10 combat encounters per standard run, 10-15% elite spawn rate on Floors 3-4
+- Documents: ~60% combat rooms, ~10 combat encounters per standard run, 10% elite base on Floors 2-3 and 15% on Floor 4 (before Dread modifiers)
 - Clarifies targets assume typical distribution, not worst/best case
 
 **D-004: Dread Event Frequency**

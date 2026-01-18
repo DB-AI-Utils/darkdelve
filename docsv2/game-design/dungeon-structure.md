@@ -66,16 +66,40 @@ Input: Single digit (1-4) or 'B' for backtrack.
 
 ### Stairwell Room
 
-Each floor has exactly ONE Stairwell room containing:
-- Stairs Down (leads to next floor)
-- Extraction Point (Floors 1-4 only; Floor 5 has none)
+Each floor has exactly ONE Stairwell room. The Stairwell counts as one of the floor's rooms.
 
-The Stairwell counts as one of the floor's rooms.
+**Stairwell contents vary by floor:**
+
+| Floors | Stairwell Contains |
+|--------|-------------------|
+| 1-2 | Stairs Down + Free Extraction Portal |
+| 3-4 | Stairs Down only (portal is dark/broken) |
+| 5 | Stairs Down only (no extraction on final floor) |
 
 Stairwell properties:
 - Visible on map from start (marked with ↓)
 - Always safe (no enemies, no events)
 - Contains ambient flavor text about depth
+
+### Waystone Chamber
+
+On Floors 3-4, extraction requires finding the **Waystone Chamber** — a separate room type distinct from the Stairwell.
+
+**Waystone Chamber properties:**
+- Spawns once per floor (guaranteed)
+- Spawns in rooms 5-8 of the floor (never first or last rooms, preventing frustration)
+- Contains an ancient Waystone that allows extraction for a cost
+- NOT visible on map from start (must be discovered through exploration)
+- Always safe (no enemies)
+- Marked with ◊ on map once discovered
+
+**Extraction costs at Waystone Chamber:**
+| Floor | Cost |
+|-------|------|
+| 3 | 10% of carried gold (min 15g) |
+| 4 | 25% of carried gold (min 25g) OR 1 item |
+
+→ *Full extraction rules: [Extraction System](extraction-system.md)*
 
 ### Descent Conditions
 
@@ -107,12 +131,14 @@ Applied immediately upon descent, before first room of new floor.
 
 ### Stairwell UI Display
 
+**Floors 1-2 (with free extraction portal):**
 ```
 ═══════════════════════════════════════════════════════════════
                     THE STAIRWELL
 ═══════════════════════════════════════════════════════════════
 
 Cold air rises from the depths below. The darkness beckons.
+A shimmering portal hums softly beside the descending stairs.
 
 ───────────────────────────────────────────────────────────────
 FLOOR 2 SUMMARY:
@@ -122,16 +148,74 @@ FLOOR 2 SUMMARY:
 ───────────────────────────────────────────────────────────────
 
   [1] DESCEND TO FLOOR 3
-      Warning: +5 Dread. Extraction will cost gold or items.
+      Warning: +5 Dread. No free extraction below.
 
-  [2] EXTRACT NOW (Free on Floors 1-2)
-      "Leave with what you have. Live to delve another day."
+  [2] EXTRACT NOW (Free)
+      "Step through the portal. Live to delve another day."
 
   [3] RETURN TO FLOOR
       "There may be rooms you haven't explored."
 
 ───────────────────────────────────────────────────────────────
 HP: 42/50 | Dread: 28 | Gold: 34
+> _
+```
+
+**Floors 3-4 (no extraction portal):**
+```
+═══════════════════════════════════════════════════════════════
+                    THE STAIRWELL
+═══════════════════════════════════════════════════════════════
+
+Cold air rises from the depths below. The darkness beckons.
+The portal archway stands dark and silent—broken long ago.
+
+───────────────────────────────────────────────────────────────
+FLOOR 3 SUMMARY:
+  Rooms Explored: 3/5
+  Enemies Slain:  2
+  Gold Found:     67
+  Waystone: NOT FOUND
+───────────────────────────────────────────────────────────────
+
+  [1] DESCEND TO FLOOR 4
+      Warning: +5 Dread. You have not found the Waystone.
+
+  [2] RETURN TO FLOOR
+      "The Waystone must be here somewhere..."
+
+───────────────────────────────────────────────────────────────
+HP: 38/50 | Dread: 41 | Gold: 67
+> _
+```
+
+### Waystone Chamber UI Display
+
+```
+═══════════════════════════════════════════════════════════════
+                 THE WAYSTONE CHAMBER
+═══════════════════════════════════════════════════════════════
+
+An ancient stone hums with power, runes flickering across its
+surface. The air tastes of ozone and distant places.
+
+"The Waystone demands tribute for passage."
+
+───────────────────────────────────────────────────────────────
+EXTRACTION COST: 7 gold (10% of 67, min 15 → 15 gold)
+───────────────────────────────────────────────────────────────
+
+  [1] PAY 15 GOLD - EXTRACT NOW
+      "Leave with what you have. The dungeon releases you."
+
+  [2] SACRIFICE ITEM INSTEAD
+      "The Waystone accepts material offerings."
+
+  [3] RETURN TO FLOOR
+      "Not yet. There's more to find."
+
+───────────────────────────────────────────────────────────────
+HP: 38/50 | Dread: 41 | Gold: 67
 > _
 ```
 
@@ -143,19 +227,19 @@ Each dungeon has 5 floors with escalating risk and reward:
 
 | Floor | Rooms | Duration | Difficulty | Key Feature |
 |-------|-------|----------|------------|-------------|
-| 1 | 5 | ~4 min | Easy | Introductory floor, free extract |
-| 2 | 5 | ~5 min | Medium | Elites introduced (10% spawn) |
-| 3 | 5 | ~5 min | Hard | Waystone extraction costs begin |
+| 1 | 5 | ~4 min | Easy | Introductory floor, free extract at Stairwell |
+| 2 | 5 | ~5 min | Medium | Elites introduced (10% base; higher on deeper floors) |
+| 3 | 5 | ~5 min | Hard | Waystone Chamber (must find to extract) |
 | 4 | 5 | ~5 min | Very Hard | Armored enemies, Shadow Stalker ambush, epic loot |
-| 5 | 8 | ~9 min | Extreme | Room count increase, Boss, Legendary chance |
+| 5 | 8 | ~9 min | Extreme | Room count increase, Boss guards only exit |
 
 **Total: 28 rooms for full clear = 20-28 minutes**
 
 **Mechanic Introduction Principle:** Each floor introduces ONE major new mechanic. Never stack multiple new challenges simultaneously.
 
 **Floor Introduction Sequence:**
-1. **Floor 1-2:** Core mechanics, free extraction (safe learning zone)
-2. **Floor 3:** Waystone cost begins (economic pressure only)
+1. **Floor 1-2:** Core mechanics, free extraction at Stairwell (safe learning zone)
+2. **Floor 3:** Waystone Chamber introduced (must find + pay to extract)
 3. **Floor 4:** Armored enemies (Heavy Attack requirement), Shadow Stalker ambush mechanic, epic loot potential
 4. **Floor 5:** Room count increase, Boss guards only exit (all-or-nothing finale)
 
@@ -249,19 +333,20 @@ The Threshold Chamber offers a **Retreat** option—NOT extraction. This returns
 
 ## Floor Layout
 
-Room breakdown by floor (encounter rooms designed for 1-1.5 min/room average; Stairwell is shorter):
+Room breakdown by floor (encounter rooms designed for 1-1.5 min/room average; Stairwell/Waystone are shorter):
 
 > **MVP Scope**: MVP uses 0 rest rooms on Floor 5. The rest/special room is a post-MVP addition.
 
-| Floor | Combat | Treasure | Event | Rest/Special | Stairwell | Boss | Total |
-|-------|--------|----------|-------|--------------|-----------|------|-------|
-| 1 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
-| 2 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
-| 3 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
-| 4 | 2 | 1 | 1 | 0 | 1 | 0 | 5 |
-| 5 | 4 | 1 | 1 | 0 | 1 | 1 | 8 |
+| Floor | Combat | Treasure | Event | Waystone | Rest/Special | Stairwell | Boss | Total |
+|-------|--------|----------|-------|----------|--------------|-----------|------|-------|
+| 1 | 2 | 1 | 1 | 0 | 0 | 1 | 0 | 5 |
+| 2 | 2 | 1 | 1 | 0 | 0 | 1 | 0 | 5 |
+| 3 | 2 | 1 | 0 | 1 | 0 | 1 | 0 | 5 |
+| 4 | 2 | 1 | 0 | 1 | 0 | 1 | 0 | 5 |
+| 5 | 4 | 1 | 1 | 0 | 0 | 1 | 1 | 8 |
 
-*MVP Floor 5: 4 combat, 1 treasure, 1 event, 0 rest, 1 stairwell, 1 boss = 8 rooms total*
+*Floors 3-4: Waystone Chamber replaces 1 Event room (maintains 5 rooms per floor)*
+*MVP Floor 5: 4 combat, 1 treasure, 1 event, 0 waystone, 0 rest, 1 stairwell, 1 boss = 8 rooms total*
 
 **Room Time Budget:**
 - Combat rooms: 1.5-2 minutes (4-8 turns)
@@ -337,6 +422,19 @@ Dark power hums in the air.
 [5] Leave
 ```
 
+### Waystone Chamber (Floors 3-4 Only)
+
+```
+An ancient Waystone rises from cracked flagstones,
+runes pulsing with faint blue light.
+
+"The stone remembers the way home. But it demands tribute."
+
+[1] Pay extraction cost  (Gold or item)
+[2] Examine the runes    (Lore fragment)
+[3] Leave
+```
+
 ### Shrine Blessing Rules
 
 - Only ONE shrine blessing can be active at a time
@@ -376,7 +474,8 @@ Legend:
   ☠ = Cleared (enemies dead)
   $ = Treasure
   * = Event
-  ↓ = Stairs down / Exit
+  ◊ = Waystone Chamber (Floors 3-4)
+  ↓ = Stairs down (Stairwell)
   . = Empty (explored)
 
 Torches: 2  |  HP: 35/50  |  Dread: 28
