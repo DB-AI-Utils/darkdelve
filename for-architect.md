@@ -45,7 +45,6 @@ This document contains design considerations and requirements that should be add
 | Valid action determination | Input parsing and command interpretation |
 | Event emission | Event visualization (damage numbers, notifications) |
 | Save/load logic | Save/load UI prompts |
-| Profile data management | Profile selection screens |
 
 ### Design Requirements
 
@@ -135,7 +134,6 @@ Store configs in a `configs/` folder. Files should be human-readable and easily 
 | `configs/veteran_knowledge.json` | Unlock thresholds for all knowledge types |
 | `configs/dungeons/*.json` | Per-dungeon: enemy roster, floor layout, boss stats |
 | `configs/agent_mode.json` | Agent output format, state verbosity, action syntax |
-| `configs/profiles.json` | Default profile settings, naming rules |
 
 **Why:** Enables rapid balance iteration without code changes. Designer can tweak values directly.
 
@@ -546,96 +544,3 @@ AI agent sessions should be tagged in analytics:
 
 This separation ensures AI data doesn't pollute human player metrics and enables AI-vs-human behavior comparison.
 
----
-
-## Profile System
-
-**The game must support multiple player profiles.** Each profile is an independent save state with its own progression, stash, unlocks, and analytics.
-
-### Storage Structure
-
-Profiles are stored in a `profiles/` directory within the project. Each profile is a folder named after the profile:
-
-```
-profiles/
-├── default/
-│   ├── save.json           # Character state, current run progress
-│   ├── stash.json          # Persistent item storage
-│   ├── unlocks.json        # Veteran Knowledge, bestiary, unlocked content
-│   ├── settings.json       # Profile-specific settings
-│   └── analytics/          # Profile-specific event logs
-│       ├── events.jsonl
-│       └── aggregates.json
-├── speedrunner_test/
-│   └── ...
-├── ai_agent_01/
-│   └── ...
-└── ...
-```
-
-### Profile Requirements
-
-| Requirement | Description |
-|-------------|-------------|
-| **Isolation** | Profiles are completely independent—no shared state |
-| **Named Folders** | Profile name = folder name (sanitized for filesystem safety) |
-| **Default Profile** | `default` profile created automatically on first launch |
-| **Profile Selection** | CLI argument or interactive selection at startup |
-| **Profile Creation** | Command to create new profile from scratch |
-| **Profile Deletion** | Remove profile folder (with confirmation) |
-| **Profile Listing** | Command to list all available profiles |
-
-### CLI Interface
-
-```bash
-# Start with specific profile
-darkdelve --profile speedrunner_test
-
-# List profiles
-darkdelve --list-profiles
-
-# Create new profile
-darkdelve --new-profile "my_new_run"
-
-# Delete profile (requires confirmation)
-darkdelve --delete-profile "old_profile"
-```
-
-### Profile Metadata
-
-Each profile maintains metadata in `profile.json`:
-
-```json
-{
-  "name": "speedrunner_test",
-  "created_at": "2026-01-15T10:30:00Z",
-  "last_played": "2026-01-20T18:45:00Z",
-  "player_type": "human",
-  "total_runs": 47,
-  "game_version": "0.3.0"
-}
-```
-
-### AI Agent Profiles
-
-When an AI agent plays, it should use a dedicated profile:
-- Tagged with `"player_type": "ai_agent"` in metadata
-- Keeps AI progression separate from human play
-- Enables comparison analysis between AI and human profiles
-
-### Portability
-
-- Profiles are self-contained folders—copy/move to backup or share
-- No external dependencies (database, registry, etc.)
-- Human-readable JSON for manual inspection/editing
-
----
-
-## Future Architect Topics
-
-Additional cross-cutting concerns to be designed:
-
-- Event bus / message passing architecture
-- Modding support considerations
-- Accessibility features
-- Localization architecture
