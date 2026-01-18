@@ -54,6 +54,7 @@ High-level flow:
 **Core Systems**
 - Run Orchestrator: transitions between camp, dungeon run, extraction, death.
 - Dungeon System: dungeon structure, room traversal, exploration state.
+- Event System: resolve event rooms, choices, and outcomes.
 - Combat System: turn resolution, stamina, status effects.
 - Dread System: mental strain and information uncertainty rules.
 - Extraction System: push-your-luck exit logic.
@@ -68,7 +69,7 @@ High-level flow:
 - Rule Evaluation: shared rules for validation and calculations.
 
 **Persistence and Analytics**
-- Profile Store: local persistence for the single profile, saves, stash, unlocks (camp-only).
+- Profile Store: local persistence for the single profile, saves, stash, unlocks (no mid-run saves).
 - Analytics Logger: local event capture for later analysis.
 
 ## 7. Module Boundaries (High Level)
@@ -108,6 +109,15 @@ High-level flow:
 **Interfaces:**
 - Provides: current room state, room transitions.
 - Requires: content registry, RNG.
+
+### Module: Event System
+**Responsibility:** Resolve EVENT rooms via data-driven definitions; present options and outcomes with deterministic pre-rolls.
+**Boundaries:**
+- OWNS: event instantiation, option availability, outcome resolution.
+- DOES NOT OWN: room generation, combat resolution, persistence, rendering.
+**Interfaces:**
+- Provides: startEvent, getEventState, chooseOption.
+- Requires: content registry, RNG, core systems for effect application.
 
 ### Module: Combat System
 **Responsibility:** Turn-based combat resolution.

@@ -319,6 +319,7 @@ Short sentences. Hard consonants. The FEEL of impact.
 | Camp hub | P0 | Full UI navigation (see [Camp System](game-design/camp-system.md)) |
 | Stash system | P0 | 12 slots, bring up to 2 items per run |
 | Save system | P0 | Auto-save on commit actions (see [Save System](game-design/save-system.md)) |
+| Agent mode | P1 | Structured JSON output for AI playtesting |
 | Gold tracking | P0 | Per-run gold and persistent gold (at camp) |
 | Basic Dread | P1 | Thresholds, unreliable narrator |
 | Death bestiary | P1 | Chronicler unlocks (binary: unknown/known for MVP) |
