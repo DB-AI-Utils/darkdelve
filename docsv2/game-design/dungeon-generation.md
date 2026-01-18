@@ -36,7 +36,7 @@ Players should be able to **plan generally** but face **specific uncertainty**:
 | Element | How It Varies |
 |---------|---------------|
 | Room order within floors | Rooms shuffle, connections change |
-| Enemy composition | Different combinations from the dungeon's roster |
+| Enemy selection | Single-enemy choice from the dungeon's roster |
 | Loot contents | Pulls from dungeon loot pool, rarity weighted by floor |
 | Events/encounters | Selected from thematic pool per dungeon |
 | Shrine types | Random selection from available shrines |
@@ -76,7 +76,7 @@ This creates the extraction dilemma organically: *"Stay longer for better loot, 
 To avoid "seed exhaustion" (players seeing all variants quickly):
 
 ```
-4 room templates × 3 floor layouts × 5 enemy compositions
+4 room templates × 3 floor layouts × 5 enemy selections
 = 60 combinations minimum per floor
 = hundreds of thousands of possible dungeon runs
 ```
@@ -89,7 +89,7 @@ To avoid "seed exhaustion" (players seeing all variants quickly):
 
 - Fixed 5-floor structure with boss on floor 5
 - Randomized room ORDER within floors (5-8 rooms per floor, including Stairwell)
-- Enemy composition from fixed roster, scaled by floor
+- Single-enemy selection from fixed roster, scaled by floor
 - Single event pool
 - Basic loot tables per dungeon
 

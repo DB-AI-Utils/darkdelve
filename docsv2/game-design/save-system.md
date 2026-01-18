@@ -12,11 +12,13 @@ DARKDELVE saves automatically at key moments to protect player progress without 
 |-------|-------|-----------|
 | Dungeon extraction | Yes | Run completed successfully, rewards secured |
 | Player death | Yes | Run completed (failed), unlocks applied |
-| Merchant transaction | Yes | Economic decision is final |
+| Camp merchant transaction | Yes | Economic decision is final |
 | Stash deposit/withdrawal | Yes | Item management decision is final |
 | Item identification | Yes | Resource spent, outcome locked |
 | Stash reorganization | No | Cosmetic, no gameplay impact |
 | Mid-dungeon | **Never** | Roguelike integrity preserved |
+
+**Note:** Dungeon merchant purchases do NOT trigger saves. Mid-dungeon saves remain disabled.
 
 ---
 
@@ -94,7 +96,7 @@ lessonLearned: { enemyType: string, runsRemaining: number } | null
 │                                                             │
 │  CAMP (saved state)                                         │
 │    │                                                        │
-│    ├─► Merchant transaction ──► AUTO-SAVE                   │
+│    ├─► Camp merchant transaction ──► AUTO-SAVE              │
 │    ├─► Stash deposit/withdraw ──► AUTO-SAVE                 │
 │    ├─► Item identification ──► AUTO-SAVE                    │
 │    │                                                        │
@@ -124,7 +126,7 @@ lessonLearned: { enemyType: string, runsRemaining: number } | null
 ## Edge Cases
 
 ### Player closes game mid-camp-session
-- All commit actions (merchant, stash, identification) already saved
+- All commit actions (camp merchant, stash, identification) already saved
 - Cosmetic changes (stash slot rearrangement) may be lost — acceptable
 
 ### Player closes game mid-dungeon

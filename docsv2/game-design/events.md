@@ -310,6 +310,7 @@ A merchant has set up shop in this unlikely place.
 - Limited stock: 3 consumables only
 - Cannot sell to dungeon merchant
 - Same merchant on Floor 2 and 4 (remembers purchases)
+- Purchases do not trigger a save (mid-dungeon saves never)
 
 ---
 

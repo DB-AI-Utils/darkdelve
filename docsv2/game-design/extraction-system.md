@@ -64,7 +64,7 @@ The deeper you go, the more the dungeon corrupts what you find:
 - Floors 2-3: 10%
 - Floors 4-5: 15%
 
-**Note:** In-dungeon NPCs (wandering merchants, mysterious strangers) are post-MVP features. The camp Merchant has static prices. See [Reference Numbers](reference-numbers.md#merchant-system) for Merchant specification.
+**Note:** The dungeon merchant is included in MVP (see [Events](events.md)). Other in-dungeon NPCs remain post-MVP. The camp Merchant has static prices. See [Reference Numbers](reference-numbers.md#merchant-system) for Merchant specification.
 
 **Cursed item design:** +30% primary stat, negative secondary effect (makes curses interesting choices, not just bad luck).
 

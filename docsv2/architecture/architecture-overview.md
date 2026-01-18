@@ -22,10 +22,11 @@ DARKDELVE is a single-player, local-only CLI game with future UI expansion. The 
 ## 4. Key Decisions and Trade-offs
 - Architecture style: modular monolith for a local-only, single-process runtime.
 - Core/presentation boundary: command and query API with an event stream.
+- Perception: core-owned, deterministic perceived state shared by all adapters.
 - Persistence: single JSON save file with explicit versioning; no mid-dungeon saves.
 - Content and balance source: external JSON with a Content Registry.
 - Validation timing: fail fast at startup; dev hot-reload keeps last known good data.
-- Analytics: minimal local JSON event set.
+- Analytics: minimal local JSON event set with corruption metadata.
 - Agent mode: included in MVP with structured JSON output.
 
 ## 5. System Overview
@@ -36,7 +37,7 @@ Actors:
 High-level flow:
 - Presentation translates input into commands.
 - Game Core validates commands, mutates state, emits events.
-- Presentation queries state and renders output.
+- Presentation queries perceived state and renders output.
 - Persistence stores and restores the single profile; mid-dungeon run state is not persisted.
 - Analytics captures structured events locally.
 
@@ -57,6 +58,7 @@ High-level flow:
 - Event System: resolve event rooms, choices, and outcomes.
 - Combat System: turn resolution, stamina, status effects.
 - Dread System: mental strain and information uncertainty rules.
+- Perception System: applies uncertainty rules to produce perceived state.
 - Extraction System: push-your-luck exit logic.
 - Items and Loot: inventory, drops, identification.
 - Character and Progression: stats, leveling, veteran knowledge.
@@ -137,6 +139,15 @@ High-level flow:
 - Provides: applyDread, computeInformationUncertainty.
 - Requires: config values.
 
+### Module: Perception System
+**Responsibility:** Generate perceived state from truth state and uncertainty rules.
+**Boundaries:**
+- OWNS: perception rules and deterministic distortion.
+- DOES NOT OWN: rendering or input parsing.
+**Interfaces:**
+- Provides: getPerceivedState.
+- Requires: dread system, RNG.
+
 ### Module: Extraction System
 **Responsibility:** Exit rules and risk calculations.
 **Boundaries:**
@@ -201,7 +212,7 @@ High-level flow:
 - Requires: local filesystem.
 
 ### Module: Analytics Logger
-**Responsibility:** Capture structured event data locally.
+**Responsibility:** Capture structured event data locally, including perception corruption metadata.
 **Boundaries:**
 - OWNS: event schema, storage format.
 - DOES NOT OWN: event generation logic.
@@ -210,12 +221,13 @@ High-level flow:
 - Requires: event stream, profile context.
 
 ## 8. Data Flow (Examples)
-- Start run: Presentation -> Game Core API -> Run Orchestrator -> Dungeon System -> emits events -> Presentation renders state.
+- Start run: Presentation -> Game Core API -> Run Orchestrator -> Dungeon System -> emits events -> Perception System -> Presentation renders state.
 - Combat action: Presentation -> executeAction -> Combat System -> Items/Dread updates -> events -> Analytics Logger and Presentation.
 - Extraction: Presentation -> Extraction System -> Run Orchestrator -> Profile Store -> events -> Presentation.
 - Death: Combat System -> Death and Discovery -> Profile Store -> events -> Presentation.
 
 ## 9. Interface Contracts (TypeScript)
+Note: getState returns the perceived state; truth state is internal for testing/debug only.
 ```ts
 interface GameCore {
   getState(): GameState;
@@ -230,6 +242,7 @@ interface GameCore {
 - Deterministic core with injected RNG and explicit seeds.
 - No I/O in core modules.
 - Event stream used for presentation and analytics.
+- Perception is core-owned; adapters only render perceived state.
 - All tunable values are externalized.
 
 ## 11. Next Steps for Engineer

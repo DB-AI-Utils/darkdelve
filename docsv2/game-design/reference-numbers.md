@@ -445,7 +445,7 @@ Use these metrics during playtesting:
 - Added to `reference-numbers.md`: per-enemy gold (3-75g range), chest values, floor multipliers
 
 **B-005: Dungeon Layout Generation**
-- Added to `dungeon-generation.md`: 3 layout templates, generation pseudocode, enemy composition pools
+- Added to `dungeon-generation.md`: 3 layout templates, generation pseudocode, enemy selection pools
 
 **B-006: MVP Item Templates**
 - Added to `items.md`: 15 equipment items + 5 consumables with complete stat values
@@ -511,7 +511,7 @@ Use these metrics during playtesting:
 - **Problem:** Floor 3 introduced TWO major changes simultaneously (Waystone cost AND Armored Ghoul), violating "one major mechanic per floor" principle
 - **Resolution:** Moved Armored Ghoul floor range from 3-4 to 4-5
 - Updated `reference-numbers.md` enemy stats table
-- Updated `dungeon-generation.md` enemy composition pools (Floor 3 no longer includes Armored Ghoul; Floors 4-5 now include Armored Ghoul)
+- Updated `dungeon-generation.md` enemy selection pools (Floor 3 no longer includes Armored Ghoul; Floors 4-5 now include Armored Ghoul)
 - Floor 3 now introduces only Waystone extraction cost; Floor 4 introduces armored enemies alongside Shadow Stalker
 
 *Balance Fixes:*
@@ -759,7 +759,7 @@ Resolved blockers 3-9 and Floor 3 Difficulty Spike. Completed full 10-enemy MVP 
 
 *Save System:*
 - Added new "Save System" section (Section 8) with full specification
-- Defined save trigger events: extraction, death, merchant transactions, stash operations, item identification
+- Defined save trigger events: extraction, death, camp merchant transactions, stash operations, item identification
 - Specified NO mid-dungeon saves (roguelike integrity)
 - Added save data schema covering character, stash, veteran knowledge, bestiary, unlocks, statistics
 - Documented session lifecycle flow with ASCII diagram
