@@ -451,10 +451,12 @@ Fleeing is always an option but never free:
 | Basic | 70% | +5 Dread | +2 Dread, lose turn |
 | Elite | 50% | +5 Dread | +2 Dread, lose turn |
 | Boss | 0% | Cannot flee | N/A |
+| The Watcher | N/A | Cannot flee | N/A |
 
 **Restrictions:**
 - Cannot flee on round 1
 - Cannot flee during ambush
+- Cannot flee from The Watcher (escape via stun-window extraction only; see [Dread System](dread-system.md#watcher-stun-mechanics))
 
 Fleeing should be a meaningful decision, not a safety valve. The Dread penalty on successful flee creates tension even when escape succeeds (aligned with Darkest Dungeon's 25 stress on retreat).
 

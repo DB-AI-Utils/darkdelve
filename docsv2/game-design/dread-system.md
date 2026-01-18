@@ -123,7 +123,7 @@ This ensures new players CAN escape with skilled play, but escape is not guarant
 | Guaranteed Hit | Dodge does NOT avoid Watcher attacks |
 | Block Works | Block reduces Watcher damage by 50% (25 damage instead of 50) |
 | Armor Stacks | Player armor reduction applies normally |
-| No Flee | Cannot flee from The Watcher (extraction blocking) |
+| No Combat Flee | The Flee action is disabled; escape via stun-window extraction only |
 | Smoke Bomb | Does NOT bypass Watcher extraction block (flee restrictions only) |
 
 **Damage Calculation vs The Watcher:**

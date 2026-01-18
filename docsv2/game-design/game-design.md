@@ -388,7 +388,7 @@ Research shows 3 enemy types is a SEVERE content gap. Target 8-10 minimum:
 |------|-------|------------|
 | Unreliable narrator frustrates players | HIGH | Only corrupt information, never input. Always signal when perception is compromised ("Your vision swims..."). |
 | Show missed loot feels punishing | MEDIUM | Never show Legendary items. Frame as "adventure hook" not punishment. |
-| The Watcher feels unfair | MEDIUM | Clear visual/text signals before spawn. Give player time to react. Ensure fleeing The Watcher is possible (it pursues, not instakills). |
+| The Watcher feels unfair | MEDIUM | Clear visual/text signals before spawn. Give player time to react. Combat Flee action is disabled, but escape is possible via stun-window extraction (it pursues, not instakills). |
 | Turn-based combat feels slow | MEDIUM | Keep fights to 4-8 turns. Snappy UI. Show damage calculation as mini-celebration. |
 | Extraction makes deep floors feel optional | LOW | Best loot is floor 4-5 exclusive. Bounties require deep runs. Boss has Legendary chance. |
 | Stash items never used ("gear fear") | MEDIUM | Monitor usage rates. If <30% of runs bring items, consider "Soul Echo" recovery mechanic (1 item returns damaged) or reduce stash item power. |

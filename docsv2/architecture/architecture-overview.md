@@ -28,6 +28,7 @@ DARKDELVE is a single-player, local-only CLI game with future UI expansion. The 
 - Validation timing: fail fast at startup; dev hot-reload keeps last known good data.
 - Analytics: minimal local JSON event set with corruption metadata.
 - Agent mode: included in MVP with structured JSON output.
+- Watcher ownership: split by domain (Dread owns lifecycle/escape-window state, Dungeon owns pursuit presence, Combat applies Watcher combat rules and detects stuns, Extraction queries escape eligibility).
 
 ## 5. System Overview
 Actors:
@@ -54,10 +55,10 @@ High-level flow:
 
 **Core Systems**
 - Run Orchestrator: transitions between camp, dungeon run, extraction, death.
-- Dungeon System: dungeon structure, room traversal, exploration state.
+- Dungeon System: dungeon structure, room traversal, exploration state, Watcher pursuit presence.
 - Event System: resolve event rooms, choices, and outcomes.
 - Combat System: turn resolution, stamina, status effects.
-- Dread System: mental strain and information uncertainty rules.
+- Dread System: mental strain, information uncertainty rules, Watcher lifecycle.
 - Perception System: applies uncertainty rules to produce perceived state.
 - Extraction System: push-your-luck exit logic.
 - Items and Loot: inventory, drops, identification.
@@ -71,7 +72,7 @@ High-level flow:
 - Rule Evaluation: shared rules for validation and calculations.
 
 **Persistence and Analytics**
-- Profile Store: local persistence for the single profile, saves, stash, unlocks (no mid-run saves).
+- Profile Store: local persistence for the single profile, saves, stash, unlocks, event flags (no mid-run saves).
 - Analytics Logger: local event capture for later analysis.
 
 ## 7. Module Boundaries (High Level)
@@ -106,7 +107,7 @@ High-level flow:
 ### Module: Dungeon System
 **Responsibility:** Structure, rooms, navigation, encounters.
 **Boundaries:**
-- OWNS: dungeon topology and exploration state.
+- OWNS: dungeon topology, exploration state, fled room state preservation, and Watcher pursuit presence across rooms.
 - DOES NOT OWN: combat resolution.
 **Interfaces:**
 - Provides: current room state, room transitions.
@@ -119,13 +120,13 @@ High-level flow:
 - DOES NOT OWN: room generation, combat resolution, persistence, rendering.
 **Interfaces:**
 - Provides: startEvent, getEventState, chooseOption.
-- Requires: content registry, RNG, core systems for effect application.
+- Requires: content registry, RNG, core systems for effect application, profile event flags (read-only).
 
 ### Module: Combat System
 **Responsibility:** Turn-based combat resolution.
 **Boundaries:**
-- OWNS: turn order, stamina, damage, status effects.
-- DOES NOT OWN: rendering or input parsing.
+- OWNS: turn order, stamina, damage, status effects, enemy AI execution, flee resolution, and Watcher combat rules.
+- DOES NOT OWN: AI behavior definitions, rendering, input parsing.
 **Interfaces:**
 - Provides: resolveAction, combat state updates.
 - Requires: content registry, RNG, dread rules.
@@ -133,10 +134,10 @@ High-level flow:
 ### Module: Dread System
 **Responsibility:** Dread accumulation and uncertainty rules.
 **Boundaries:**
-- OWNS: dread level and thresholds.
+- OWNS: dread level and thresholds, Watcher lifecycle, and escape-window state.
 - DOES NOT OWN: how uncertainty is displayed.
 **Interfaces:**
-- Provides: applyDread, computeInformationUncertainty.
+- Provides: applyDread, computeInformationUncertainty, getWatcherState.
 - Requires: config values.
 
 ### Module: Perception System
@@ -155,7 +156,7 @@ High-level flow:
 - DOES NOT OWN: dungeon traversal.
 **Interfaces:**
 - Provides: canExtract, resolveExtraction.
-- Requires: dungeon state, dread level, inventory state.
+- Requires: dungeon state, dread level, inventory state, Watcher state.
 
 ### Module: Items and Loot
 **Responsibility:** Inventory, drops, identification, equip eligibility.
@@ -196,7 +197,7 @@ High-level flow:
 ### Module: Content Registry
 **Responsibility:** Load and validate all configs and content.
 **Boundaries:**
-- OWNS: data parsing, validation, lookup APIs.
+- OWNS: data parsing, validation, lookup APIs, enemy AI behavior data.
 - DOES NOT OWN: gameplay logic.
 **Interfaces:**
 - Provides: getItem, getMonster, getConfig, rollLootTable.
@@ -205,10 +206,10 @@ High-level flow:
 ### Module: Profile Store
 **Responsibility:** Persist profile state and camp checkpoints (no mid-run snapshots).
 **Boundaries:**
-- OWNS: serialization formats and versioning.
+- OWNS: serialization formats, versioning, and cross-run event flags.
 - DOES NOT OWN: gameplay rules.
 **Interfaces:**
-- Provides: loadProfile, saveProfile.
+- Provides: loadProfile, saveProfile, getEventFlags.
 - Requires: local filesystem.
 
 ### Module: Analytics Logger
@@ -225,9 +226,11 @@ High-level flow:
 - Combat action: Presentation -> executeAction -> Combat System -> Items/Dread updates -> events -> Analytics Logger and Presentation.
 - Extraction: Presentation -> Extraction System -> Run Orchestrator -> Profile Store -> events -> Presentation.
 - Death: Combat System -> Death and Discovery -> Profile Store -> events -> Presentation.
+- Flee: Player flees -> Combat resolves -> emits event -> Dread applies cost -> Dungeon marks room as fled.
+- Watcher activation: Dread reaches threshold -> Dread marks Watcher active -> Dungeon adds pursuit presence -> Combat applies Watcher combat rules -> Extraction checks Watcher state.
 
 ## 9. Interface Contracts (TypeScript)
-Note: getState returns the perceived state; truth state is internal for testing/debug only.
+Note: getState returns the perceived state; truth state is internal for testing/debug only. Actions are categorized by game mode (camp, dungeon, combat, event); getAvailableActions returns only actions valid for the current mode.
 ```ts
 interface GameCore {
   getState(): GameState;
