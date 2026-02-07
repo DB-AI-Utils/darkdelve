@@ -11,6 +11,7 @@ export interface TaskConfig {
   maxHours: number;
   maxBudgetUsd: number;
   turnsPerIteration: number;
+  freshSession: boolean;
   completionChecks: CompletionCheck[];
   body: string;
   filePath: string;
@@ -33,6 +34,7 @@ export function parseTask(filePath: string): TaskConfig {
     maxHours: config.max_hours ?? 4,
     maxBudgetUsd: config.max_budget_usd ?? 30,
     turnsPerIteration: config.turns_per_iteration ?? 30,
+    freshSession: config.fresh_session === true,
     completionChecks: parseCompletionChecks(config.completion_checks),
     body: body.trim(),
     filePath,

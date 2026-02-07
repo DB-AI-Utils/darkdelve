@@ -58,9 +58,10 @@ async function main() {
     clearSignalFile();
 
     const isFirstIteration = state.iteration === 1 && !state.sessionId;
+    const useFreshSession = task.freshSession || isFirstIteration;
 
-    const prompt = isFirstIteration
-      ? task.body
+    const prompt = useFreshSession
+      ? task.body + "\n\nCheck .orchestrator/progress.md for any prior progress."
       : `Continue working. Re-read the task file at ${resolvedTaskFile} if needed. ` +
         "Check .orchestrator/progress.md for current state.";
 
@@ -73,9 +74,12 @@ async function main() {
     log.info(`--- Iteration ${state.iteration} ---`);
 
     try {
-      const shouldFork = state.compactions > 3;
+      const shouldFork = !useFreshSession && state.compactions > 3;
       if (shouldFork) {
         log.info("Forking session due to >3 compactions.");
+      }
+      if (useFreshSession && !isFirstIteration) {
+        log.info("Fresh session mode: starting clean context.");
       }
 
       const mcpServers = loadMcpServers();
@@ -86,7 +90,7 @@ async function main() {
           maxTurns: task.turnsPerIteration,
           maxBudgetUsd: task.maxBudgetUsd,
           cwd,
-          resume: state.sessionId ?? undefined,
+          resume: useFreshSession ? undefined : (state.sessionId ?? undefined),
           forkSession: shouldFork,
           canUseTool: buildCanUseTool(log),
           hooks: {
