@@ -1,0 +1,22 @@
+{
+  "name": "DARKDELVE Dev",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "CLAUDE_CODE_VERSION": "latest",
+      "ZSH_IN_DOCKER_VERSION": "1.2.0"
+    }
+  },
+  "remoteUser": "node",
+  "mounts": [
+    "source=darkdelve-bashhistory,target=/commandhistory,type=volume",
+    "source=darkdelve-claude-config,target=/home/node/.claude,type=volume",
+    "source=darkdelve-codex-config,target=/home/node/.codex,type=volume"
+  ],
+  "containerEnv": {
+    "NODE_OPTIONS": "--max-old-space-size=4096",
+    "CLAUDE_CONFIG_DIR": "/home/node/.claude"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
+  "workspaceFolder": "/workspace"
+}

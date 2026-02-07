@@ -1,0 +1,53 @@
+services:
+  darkdelve-dev:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+      args:
+        CLAUDE_CODE_VERSION: latest
+    container_name: darkdelve-dev
+    volumes:
+      - .:/workspace:delegated
+      - darkdelve-bashhistory:/commandhistory
+      - darkdelve-claude-config:/home/node/.claude
+      - darkdelve-codex-config:/home/node/.codex
+    working_dir: /workspace
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - CLAUDE_CONFIG_DIR=/home/node/.claude
+      - DEVCONTAINER=true
+    user: node
+    command: sleep infinity
+    stdin_open: true
+    tty: true
+
+  darkdelve-auto:
+    build:
+      context: .devcontainer
+      dockerfile: Dockerfile
+      args:
+        CLAUDE_CODE_VERSION: latest
+    container_name: darkdelve-auto
+    volumes:
+      - .:/workspace:delegated
+      - darkdelve-bashhistory:/commandhistory
+      - darkdelve-claude-config:/home/node/.claude
+      - darkdelve-codex-config:/home/node/.codex
+    working_dir: /workspace
+    environment:
+      - NODE_OPTIONS=--max-old-space-size=4096
+      - CLAUDE_CONFIG_DIR=/home/node/.claude
+      - DEVCONTAINER=true
+      - TASK_FILE=${TASK_FILE:-tasks/example.md}
+    user: node
+    mem_limit: 4g
+    cpus: 2
+    command: sh -c "cd /workspace/orchestrator && npm install --no-audit --no-fund && cd /workspace && npx tsx /workspace/orchestrator/src/index.ts"
+    profiles:
+      - auto
+    restart: on-failure:3
+
+volumes:
+  darkdelve-bashhistory:
+  darkdelve-claude-config:
+  darkdelve-codex-config:

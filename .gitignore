@@ -1,1 +1,7 @@
 .idea
+.env
+.orchestrator/logs/
+.orchestrator/state.json
+.orchestrator/task-signal
+orchestrator/node_modules/
+orchestrator/package-lock.json
