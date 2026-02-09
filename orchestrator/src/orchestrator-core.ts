@@ -95,7 +95,7 @@ export class OrchestratorEmitter extends EventEmitter<OrchestratorEvents> {
 // --- MCP loader ---
 
 function loadMcpServers(cwd: string): Record<string, unknown> | undefined {
-  const mcpPath = resolve(cwd, ".mcp.json");
+  const mcpPath = resolve(cwd, ".mcp.orchestrator.json");
   if (!existsSync(mcpPath)) return undefined;
   try {
     const raw = JSON.parse(readFileSync(mcpPath, "utf-8"));

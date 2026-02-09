@@ -2,7 +2,7 @@
 
 /**
  * Claudestrator — host CLI entry point.
- * Manages Docker containers running Claude Agent SDK tasks.
+ * Interactive dashboard for managing autonomous Claude Agent SDK tasks in Docker containers.
  */
 
 import Docker from "dockerode";
@@ -10,8 +10,8 @@ import { existsSync, readdirSync } from "fs";
 import { resolve, dirname } from "path";
 import { fileURLToPath } from "url";
 import { ensureDirs, paths } from "./paths.js";
-import { MemoryTaskStore } from "./task/store.js";
-import { TaskRunner } from "./task/runner.js";
+import { SqliteTaskStore } from "./task/store.js";
+import { TaskScheduler } from "./task/scheduler.js";
 import { cleanupOrphanedContainers, runLoginContainer } from "./docker/manager.js";
 import { ensureImage } from "./docker/image.js";
 import { pruneOrphanedWorktrees } from "./worktree.js";
@@ -21,35 +21,33 @@ import type { TaskCreateInput } from "./types.js";
 // --- CLI arg parsing ---
 
 interface CliArgs {
-  command: "run" | "login" | "help";
+  command: "dashboard" | "run" | "login" | "help";
   project?: string;
   prompt?: string;
   maxIterations?: number;
   maxHours?: number;
   maxBudgetUsd?: number;
   turnsPerIteration?: number;
-  tui: boolean;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
   const args = argv.slice(2);
   const firstArg = args[0];
-  let command: CliArgs["command"] = "help";
+  let command: CliArgs["command"] = "dashboard";
+
   if (firstArg === "run") command = "run";
   else if (firstArg === "login") command = "login";
   else if (firstArg === "help" || firstArg === "--help" || firstArg === "-h") command = "help";
-  else if (firstArg) command = "run"; // default to run if unknown
+  else if (!firstArg) command = "dashboard";
+  else command = "help"; // unknown command
 
-  const rest = ["run", "login", "help"].includes(firstArg) ? args.slice(1) : args;
+  const rest = ["run", "login", "help", "dashboard"].includes(firstArg) ? args.slice(1) : args;
 
   const map = new Map<string, string>();
   const positional: string[] = [];
-  let tui = false;
 
   for (let i = 0; i < rest.length; i++) {
-    if (rest[i] === "--tui") {
-      tui = true;
-    } else if (rest[i].startsWith("--") && i + 1 < rest.length) {
+    if (rest[i].startsWith("--") && i + 1 < rest.length) {
       map.set(rest[i].slice(2), rest[++i]);
     } else if (!rest[i].startsWith("--")) {
       positional.push(rest[i]);
@@ -64,7 +62,6 @@ function parseCliArgs(argv: string[]): CliArgs {
     maxHours: map.has("max-hours") ? parseFloat(map.get("max-hours")!) : undefined,
     maxBudgetUsd: map.has("max-budget") ? parseFloat(map.get("max-budget")!) : undefined,
     turnsPerIteration: map.has("turns-per-iteration") ? parseInt(map.get("turns-per-iteration")!, 10) : undefined,
-    tui,
   };
 }
 
@@ -73,8 +70,9 @@ function printHelp(): void {
 Claudestrator — Autonomous Claude Agent SDK task runner in Docker
 
 Commands:
+  (no args)                     Launch interactive dashboard
+  run --prompt <prompt>         Queue a task and launch dashboard
   login                         Authenticate Claude inside Docker (run once)
-  run --prompt <prompt>         Run a task
   help                          Show this help
 
 Options (for 'run'):
@@ -84,19 +82,18 @@ Options (for 'run'):
   --max-hours <n>             Max hours (default: 4)
   --max-budget <n>            Max budget in USD (default: 30)
   --turns-per-iteration <n>   SDK turns per iteration (default: 30)
-  --tui                       Show TUI dashboard
 
 Examples:
+  claudestrator
   claudestrator login
   claudestrator run --project . --prompt "Fix the login bug"
-  claudestrator run --project /repo --prompt "Add tests" --max-budget 5 --tui
+  claudestrator run --project /repo --prompt "Add tests" --max-budget 5
 `);
 }
 
 // --- Preflight checks ---
 
 async function preflightChecks(docker: Docker): Promise<void> {
-  // Check Docker daemon
   try {
     await docker.ping();
   } catch {
@@ -104,7 +101,6 @@ async function preflightChecks(docker: Docker): Promise<void> {
     process.exit(1);
   }
 
-  // Check git
   try {
     const { execSync } = await import("child_process");
     execSync("git --version", { stdio: "pipe" });
@@ -132,11 +128,8 @@ async function runLogin(docker: Docker, contextDir: string): Promise<void> {
   console.log("Press Ctrl+D or type 'exit' when done.\n");
 
   await ensureImage(docker, contextDir);
-
-  // Use docker run -it --rm directly for proper TTY passthrough
   runLoginContainer();
 
-  // Verify auth was saved
   const authFiles = readdirSync(paths.auth);
   if (authFiles.length > 0) {
     console.log(`\nAuth saved. Found ${authFiles.length} file(s) in ~/.claudestrator/auth/`);
@@ -170,20 +163,9 @@ if (cliArgs.command === "login") {
   process.exit(0);
 }
 
-// --- Run command ---
-
-if (!cliArgs.prompt) {
-  console.error("Error: --prompt is required. Use `claudestrator help` for usage.");
-  process.exit(1);
-}
+// --- Dashboard / Run ---
 
 checkAuth();
-
-const projectDir = resolve(cliArgs.project ?? ".");
-if (!existsSync(projectDir)) {
-  console.error(`Error: Project directory not found: ${projectDir}`);
-  process.exit(1);
-}
 
 // Startup reconciliation
 const orphaned = await cleanupOrphanedContainers(docker);
@@ -192,40 +174,78 @@ if (orphaned > 0) {
 }
 pruneOrphanedWorktrees();
 
-// Create store and runner
-const store = new MemoryTaskStore();
-const runner = new TaskRunner(docker, store, contextDir);
+// Create store and scheduler
+const store = new SqliteTaskStore();
+const scheduler = new TaskScheduler(docker, store, contextDir);
 
-// Create task input
-const input: TaskCreateInput = {
-  prompt: cliArgs.prompt,
-  projectDir,
-  maxIterations: cliArgs.maxIterations,
-  maxHours: cliArgs.maxHours,
-  maxBudgetUsd: cliArgs.maxBudgetUsd,
-  turnsPerIteration: cliArgs.turnsPerIteration,
-};
+// Recover stale "running" tasks from previous session
+for (const task of store.list({ status: "running" })) {
+  store.update(task.id, {
+    status: "failed",
+    error: "Process terminated unexpectedly (recovered on restart)",
+    finishedAt: new Date().toISOString(),
+  });
+}
 
-// Wire rendering
 const isTTY = !!(process.stdout.isTTY && process.stdin.isTTY);
 
-if (cliArgs.tui && isTTY) {
-  const task = store.create(input);
-  const { renderApp } = await import("./tui/app.js");
-  renderApp(runner, task);
-  runner.run(input, task.id).then((finalTask) => {
-    setTimeout(() => {
-      process.exit(finalTask.status === "completed" ? 0 : 1);
-    }, 500);
-  });
-} else {
-  if (cliArgs.tui && !isTTY) {
-    console.error("Warning: --tui requires an interactive terminal. Falling back to plain mode.");
+if (cliArgs.command === "run") {
+  if (!cliArgs.prompt) {
+    console.error("Error: --prompt is required for 'run'. Use `claudestrator help` for usage.");
+    process.exit(1);
   }
 
-  const renderer = createPlainRenderer();
-  runner.on("event", (taskId, event) => renderer(taskId, event));
+  const projectDir = resolve(cliArgs.project ?? ".");
+  if (!existsSync(projectDir)) {
+    console.error(`Error: Project directory not found: ${projectDir}`);
+    process.exit(1);
+  }
 
-  const finalTask = await runner.run(input);
-  process.exit(finalTask.status === "completed" ? 0 : 1);
+  const input: TaskCreateInput = {
+    prompt: cliArgs.prompt,
+    projectDir,
+    maxIterations: cliArgs.maxIterations,
+    maxHours: cliArgs.maxHours,
+    maxBudgetUsd: cliArgs.maxBudgetUsd,
+    turnsPerIteration: cliArgs.turnsPerIteration,
+  };
+
+  const task = scheduler.enqueue(input);
+
+  if (isTTY) {
+    const { renderApp } = await import("./tui/app.js");
+    renderApp(scheduler, "detail", task.id);
+    scheduler.start();
+  } else {
+    // Non-TTY: plain renderer, wait for this specific task
+    const renderer = createPlainRenderer();
+    scheduler.on("event", (taskId, event) => renderer(taskId, event));
+    scheduler.start();
+
+    // Poll until the task reaches a terminal state
+    await new Promise<void>((resolve) => {
+      const check = () => {
+        const current = store.get(task.id);
+        if (current && (current.status === "completed" || current.status === "failed" || current.status === "cancelled")) {
+          resolve();
+        } else {
+          setTimeout(check, 1000);
+        }
+      };
+      check();
+    });
+
+    const finalTask = store.get(task.id)!;
+    process.exit(finalTask.status === "completed" ? 0 : 1);
+  }
+} else {
+  // Dashboard mode (no args)
+  if (!isTTY) {
+    console.error("Error: Dashboard requires an interactive terminal. Use `claudestrator run --prompt ...` for non-TTY mode.");
+    process.exit(1);
+  }
+
+  const { renderApp } = await import("./tui/app.js");
+  renderApp(scheduler, "list");
+  scheduler.start();
 }

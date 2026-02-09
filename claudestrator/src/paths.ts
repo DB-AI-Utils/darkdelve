@@ -9,6 +9,7 @@ export const paths = {
   logs: join(BASE, "logs"),
   worktrees: join(BASE, "worktrees"),
   auth: join(BASE, "auth"),
+  tasksDb: join(BASE, "tasks.db"),
   /** ~/.claudestrator/claude.json — persisted from login container */
   claudeJson: join(BASE, "claude.json"),
 

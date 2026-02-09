@@ -2,17 +2,19 @@
 
 Run autonomous [Claude Agent SDK](https://docs.anthropic.com/en/docs/claude-code/sdk) tasks inside Docker containers. Each task gets an isolated git clone, runs the SDK orchestrator loop with configurable iteration limits and budget caps, and produces a branch in your repo when done.
 
+Supports up to 3 concurrent tasks with an interactive TUI dashboard and SQLite persistence.
+
 ## How it works
 
 ```
 Host (claudestrator CLI)              Docker Container
 ┌────────────────────────┐            ┌──────────────────────────┐
-│ TaskRunner             │  creates   │ Worker (orchestrator.ts) │
-│  - git clone --local   │──────────→│  - Agent SDK query() loop│
-│  - docker create/start │            │  - hooks & stagnation    │
-│  - tail JSONL events   │←──────────│  - writes events.jsonl   │
-│  - TUI or plain output │  reads    │  - commits on completion │
-└────────────────────────┘            └──────────────────────────┘
+│ TaskScheduler          │  creates   │ Worker (orchestrator.ts) │
+│  - SQLite task store   │──────────→│  - Agent SDK query() loop│
+│  - up to 3 concurrent  │            │  - hooks & stagnation    │
+│  - git clone --local   │            │  - writes events.jsonl   │
+│  - TUI dashboard       │←──────────│  - commits on completion │
+└────────────────────────┘  reads    └──────────────────────────┘
 ```
 
 1. Creates a local git clone of your project for isolation
@@ -48,8 +50,28 @@ This drops you into a container shell. Run `claude` then `/login` to authenticat
 
 ## Usage
 
+### Interactive Dashboard (default)
+
 ```bash
-# Basic task
+# Launch the dashboard — create and manage tasks interactively
+npx tsx src/index.ts
+```
+
+Dashboard keybindings:
+
+| Key | Action |
+|-----|--------|
+| `n` | Create new task |
+| `↑/↓` | Navigate task list |
+| `Enter` | View task detail |
+| `c` | Cancel selected task |
+| `Esc` | Back to list (from detail view) |
+| `q` | Quit |
+
+### Queue a task from CLI
+
+```bash
+# Queue a task and open the dashboard focused on it
 npx tsx src/index.ts run --project /path/to/repo --prompt "Fix the login bug"
 
 # With limits
@@ -59,12 +81,17 @@ npx tsx src/index.ts run \
   --max-iterations 5 \
   --max-budget 10 \
   --turns-per-iteration 20
-
-# TUI mode (interactive terminal required)
-npx tsx src/index.ts run --project . --prompt "Refactor utils" --tui
 ```
 
-### Options
+### Non-TTY mode
+
+When piped or run without an interactive terminal, `run` falls back to plain stderr output:
+
+```bash
+echo | npx tsx src/index.ts run --project . --prompt "Fix tests"
+```
+
+### Options (for `run`)
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -74,7 +101,10 @@ npx tsx src/index.ts run --project . --prompt "Refactor utils" --tui
 | `--max-hours <n>` | 4 | Time limit |
 | `--max-budget <n>` | 30 | Budget cap in USD |
 | `--turns-per-iteration <n>` | 30 | SDK turns per iteration |
-| `--tui` | off | Show live TUI dashboard |
+
+## Persistence
+
+Tasks are stored in SQLite at `~/.claudestrator/tasks.db`. The dashboard survives restarts — quit and relaunch to see previous tasks. Tasks that were "running" when the process was killed are recovered as "failed" on next startup.
 
 ## Output
 
@@ -102,7 +132,7 @@ Containers run with:
 
 ```
 src/
-├── index.ts              # Host CLI entry point
+├── index.ts              # Host CLI entry point (dashboard + run + login)
 ├── worker.ts             # Container entry point
 ├── types.ts              # Shared interfaces
 ├── paths.ts              # ~/.claudestrator/ path helpers
@@ -114,13 +144,19 @@ src/
 │   └── image.ts          # Image build/check
 ├── task/
 │   ├── runner.ts         # Orchestrates clone → container → events → cleanup
-│   └── store.ts          # In-memory task store
+│   ├── store.ts          # SQLite task store (persistent)
+│   └── scheduler.ts      # Concurrent task scheduler (up to 3 tasks)
 ├── worker/
 │   ├── orchestrator.ts   # SDK query() loop, hooks, stagnation, signals
 │   ├── hooks.ts          # Stop hook, PreCompact hook, canUseTool
 │   ├── completion.ts     # Completion check runner
 │   └── logger.ts         # JSONL event writer
 └── tui/
-    ├── app.tsx           # Ink TUI app
+    ├── app.tsx           # Ink TUI app (view router: list/detail/new)
+    ├── theme.ts          # Shared status colors and symbols
     └── components/
+        ├── StatusBar.tsx  # Dual-mode status bar (global/task)
+        ├── TaskList.tsx   # Interactive task list with cursor
+        ├── TaskDetail.tsx # Scrollable log viewer
+        └── NewTaskForm.tsx # Task creation form
 ```

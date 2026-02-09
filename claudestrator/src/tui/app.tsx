@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
-import { render, Box, Text, useInput } from "ink";
+import React, { useState, useEffect, useCallback } from "react";
+import { render, Box, Text, useInput, useApp } from "ink";
 import type { Task, WorkerEvent } from "../types.js";
-import type { TaskRunner } from "../task/runner.js";
+import type { TaskScheduler } from "../task/scheduler.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TaskDetail, type LogEntry } from "./components/TaskDetail.js";
+import { TaskListView } from "./components/TaskList.js";
+import { NewTaskForm } from "./components/NewTaskForm.js";
 
 function formatElapsed(ms: number): string {
   const s = Math.floor(ms / 1000);
@@ -55,61 +57,144 @@ function workerEventToLogEntry(event: WorkerEvent): { source: LogEntry["source"]
   }
 }
 
+type View = "list" | "detail" | "new";
+
 interface DashboardProps {
-  runner: TaskRunner;
-  initialTask: Task;
+  scheduler: TaskScheduler;
+  initialView: View;
+  initialTaskId: string | null;
 }
 
-function Dashboard({ runner, initialTask }: DashboardProps) {
-  const [task, setTask] = useState(initialTask);
-  const [entries, setEntries] = useState<LogEntry[]>([]);
+function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
+  const { exit } = useApp();
+  const [view, setView] = useState<View>(initialView);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId);
+  const [tasks, setTasks] = useState<Task[]>(() => scheduler.store.list());
+  const [logMap, setLogMap] = useState<Map<string, LogEntry[]>>(new Map());
   const [scrollOffset, setScrollOffset] = useState(0);
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const [uptime, setUptime] = useState("00:00:00");
 
-  // Elapsed timer
+  const startTime = useState(() => Date.now())[0];
+
+  // Uptime timer
   useEffect(() => {
-    const startedAt = task.startedAt ? new Date(task.startedAt).getTime() : Date.now();
     const interval = setInterval(() => {
-      setElapsedMs(Date.now() - startedAt);
+      setUptime(formatElapsed(Date.now() - startTime));
     }, 1000);
     return () => clearInterval(interval);
-  }, [task.startedAt]);
+  }, [startTime]);
 
-  // Subscribe to runner events
+  // Subscribe to scheduler events
   useEffect(() => {
     const onEvent = (taskId: string, event: WorkerEvent) => {
-      if (taskId !== initialTask.id) return;
       const entry = workerEventToLogEntry(event);
       if (entry) {
-        setEntries((prev) => addEntry(prev, entry.source, entry.text));
+        setLogMap((prev) => {
+          const next = new Map(prev);
+          const taskEntries = next.get(taskId) ?? [];
+          next.set(taskId, addEntry(taskEntries, entry.source, entry.text));
+          return next;
+        });
+        // Auto-scroll when viewing this task's detail
         setScrollOffset(0);
       }
     };
 
-    const onTaskUpdate = (updated: Task) => {
-      if (updated.id === initialTask.id) {
-        setTask({ ...updated });
-      }
+    const onTaskUpdate = () => {
+      setTasks(scheduler.store.list());
     };
 
-    runner.on("event", onEvent);
-    runner.on("taskUpdate", onTaskUpdate);
+    scheduler.on("event", onEvent);
+    scheduler.on("taskUpdate", onTaskUpdate);
 
     return () => {
-      runner.off("event", onEvent);
-      runner.off("taskUpdate", onTaskUpdate);
+      scheduler.off("event", onEvent);
+      scheduler.off("taskUpdate", onTaskUpdate);
     };
-  }, [runner, initialTask.id]);
+  }, [scheduler]);
 
-  // Keyboard handling
+  // Detail view keyboard
   useInput((input, key) => {
-    if (key.upArrow) {
+    if (view !== "detail") return;
+
+    if (key.escape) {
+      setView("list");
+      setSelectedTaskId(null);
+      setScrollOffset(0);
+    } else if (key.upArrow) {
+      const entries = logMap.get(selectedTaskId ?? "") ?? [];
       setScrollOffset((p) => Math.min(p + 1, Math.max(0, entries.length - 10)));
-    }
-    if (key.downArrow) {
+    } else if (key.downArrow) {
       setScrollOffset((p) => Math.max(0, p - 1));
+    } else if (input === "c" && selectedTaskId) {
+      scheduler.cancel(selectedTaskId);
     }
   });
+
+  const handleQuit = useCallback(() => {
+    scheduler.shutdown().then(() => exit());
+  }, [scheduler, exit]);
+
+  const selectedTask = selectedTaskId ? tasks.find((t) => t.id === selectedTaskId) : null;
+  const runningCount = tasks.filter((t) => t.status === "running").length;
+  const totalCost = tasks.reduce((sum, t) => sum + t.costUsd, 0);
+
+  // --- List View ---
+  if (view === "list") {
+    return (
+      <Box flexDirection="column" width="100%">
+        <Box justifyContent="center">
+          <Text bold color="cyan">Claudestrator</Text>
+        </Box>
+
+        <StatusBar
+          mode="global"
+          runningCount={runningCount}
+          totalCost={totalCost}
+          uptime={uptime}
+        />
+
+        <TaskListView
+          tasks={tasks}
+          onSelect={(taskId) => {
+            setSelectedTaskId(taskId);
+            setView("detail");
+            setScrollOffset(0);
+          }}
+          onNew={() => setView("new")}
+          onCancel={(taskId) => scheduler.cancel(taskId)}
+          onQuit={handleQuit}
+        />
+      </Box>
+    );
+  }
+
+  // --- New Task View ---
+  if (view === "new") {
+    return (
+      <Box flexDirection="column" width="100%">
+        <Box justifyContent="center">
+          <Text bold color="cyan">Claudestrator</Text>
+        </Box>
+
+        <NewTaskForm
+          onSubmit={(input) => {
+            const task = scheduler.enqueue(input);
+            setSelectedTaskId(task.id);
+            setView("detail");
+            setScrollOffset(0);
+          }}
+          onCancel={() => setView("list")}
+        />
+      </Box>
+    );
+  }
+
+  // --- Detail View ---
+  const entries = logMap.get(selectedTaskId ?? "") ?? [];
+  const elapsedMs = selectedTask?.startedAt
+    ? Date.now() - new Date(selectedTask.startedAt).getTime()
+    : 0;
 
   return (
     <Box flexDirection="column" width="100%">
@@ -117,18 +202,23 @@ function Dashboard({ runner, initialTask }: DashboardProps) {
         <Text bold color="cyan">Claudestrator</Text>
       </Box>
 
-      <StatusBar
-        taskId={task.id}
-        status={task.status}
-        elapsed={formatElapsed(elapsedMs)}
-        costUsd={task.costUsd}
-      />
+      {selectedTask && (
+        <>
+          <StatusBar
+            mode="task"
+            taskId={selectedTask.id}
+            status={selectedTask.status}
+            elapsed={formatElapsed(elapsedMs)}
+            costUsd={selectedTask.costUsd}
+          />
 
-      <Box paddingX={1} gap={3}>
-        <Text dimColor>Iteration: {task.iteration}/{task.maxIterations}</Text>
-        <Text dimColor>Budget: ${task.costUsd.toFixed(2)}/${task.maxBudgetUsd}</Text>
-        <Text dimColor>Project: {task.projectDir}</Text>
-      </Box>
+          <Box paddingX={1} gap={3}>
+            <Text dimColor>Iteration: {selectedTask.iteration}/{selectedTask.maxIterations}</Text>
+            <Text dimColor>Budget: ${selectedTask.costUsd.toFixed(2)}/{selectedTask.maxBudgetUsd}</Text>
+            <Text dimColor>Project: {selectedTask.projectDir}</Text>
+          </Box>
+        </>
+      )}
 
       <TaskDetail
         entries={entries}
@@ -137,13 +227,24 @@ function Dashboard({ runner, initialTask }: DashboardProps) {
       />
 
       <Box paddingX={1} gap={2}>
+        <Text dimColor><Text bold>Esc</Text> Back</Text>
         <Text dimColor><Text bold>↑/↓</Text> Scroll</Text>
-        <Text dimColor><Text bold>Ctrl+C</Text> Quit</Text>
+        <Text dimColor><Text bold>c</Text> Cancel task</Text>
       </Box>
     </Box>
   );
 }
 
-export function renderApp(runner: TaskRunner, task: Task): void {
-  render(<Dashboard runner={runner} initialTask={task} />);
+export function renderApp(
+  scheduler: TaskScheduler,
+  initialView: "list" | "detail" = "list",
+  initialTaskId: string | null = null,
+): void {
+  render(
+    <Dashboard
+      scheduler={scheduler}
+      initialView={initialView}
+      initialTaskId={initialTaskId}
+    />,
+  );
 }
