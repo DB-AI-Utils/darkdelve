@@ -1,0 +1,32 @@
+{
+  "name": "claudestrator",
+  "version": "0.1.0",
+  "description": "TUI dashboard for managing autonomous Claude Agent SDK tasks in Docker containers",
+  "type": "module",
+  "bin": {
+    "claudestrator": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "docker:build": "npm run build && docker build -t claudestrator:latest ."
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "latest",
+    "dockerode": "^4.0.0",
+    "ink": "^6.6.0",
+    "react": "^19.0.0",
+    "@inkjs/ui": "^2.0.0",
+    "nanoid": "^5.0.0",
+    "glob": "^11.0.0",
+    "tar-stream": "^3.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/dockerode": "^3.3.0",
+    "@types/tar-stream": "^3.1.0",
+    "typescript": "^5.7.0"
+  }
+}
