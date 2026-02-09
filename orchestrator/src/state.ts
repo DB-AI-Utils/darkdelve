@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from "fs";
 import { createHash } from "crypto";
 import { join } from "path";
+import type { RuntimeConfig } from "./config.js";
 
 export interface OrchestratorState {
   taskFile: string;
@@ -12,18 +13,19 @@ export interface OrchestratorState {
   errors: Array<{ iteration: number; error: string }>;
   progressHash: string | null;
   stagnantCount: number;
+  totalCostUsd: number;
 }
 
-const STATE_DIR = ".orchestrator";
-const STATE_FILE = join(STATE_DIR, "state.json");
-const PROGRESS_FILE = join(STATE_DIR, "progress.md");
-
-export function loadState(taskFile: string): OrchestratorState {
-  if (existsSync(STATE_FILE)) {
-    const raw = readFileSync(STATE_FILE, "utf-8");
+export function loadState(taskFile: string, config: RuntimeConfig): OrchestratorState {
+  const stateFile = join(config.stateDir, "state.json");
+  if (existsSync(stateFile)) {
+    const raw = readFileSync(stateFile, "utf-8");
     const state = JSON.parse(raw) as OrchestratorState;
-    // Only resume if same task file
-    if (state.taskFile === taskFile) return state;
+    if (state.taskFile === taskFile) {
+      // Ensure new fields exist for older state files
+      state.totalCostUsd ??= 0;
+      return state;
+    }
   }
 
   return {
@@ -36,26 +38,27 @@ export function loadState(taskFile: string): OrchestratorState {
     errors: [],
     progressHash: null,
     stagnantCount: 0,
+    totalCostUsd: 0,
   };
 }
 
-export function saveState(state: OrchestratorState): void {
-  mkdirSync(STATE_DIR, { recursive: true });
-  const tmp = STATE_FILE + ".tmp";
+export function saveState(state: OrchestratorState, config: RuntimeConfig): void {
+  mkdirSync(config.stateDir, { recursive: true });
+  const stateFile = join(config.stateDir, "state.json");
+  const tmp = stateFile + ".tmp";
   writeFileSync(tmp, JSON.stringify(state, null, 2));
-  renameSync(tmp, STATE_FILE);
+  renameSync(tmp, stateFile);
 }
 
-export function hashProgress(): string | null {
-  if (!existsSync(PROGRESS_FILE)) return null;
-  const content = readFileSync(PROGRESS_FILE, "utf-8");
+export function hashProgress(config: RuntimeConfig): string | null {
+  if (!existsSync(config.progressFile)) return null;
+  const content = readFileSync(config.progressFile, "utf-8");
   return createHash("md5").update(content).digest("hex");
 }
 
-export function updateStagnation(state: OrchestratorState): void {
-  const currentHash = hashProgress();
+export function updateStagnation(state: OrchestratorState, config: RuntimeConfig): void {
+  const currentHash = hashProgress(config);
   if (currentHash === null) {
-    // No progress file yet — not stagnant
     state.stagnantCount = 0;
     state.progressHash = null;
     return;

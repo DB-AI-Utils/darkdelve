@@ -30,10 +30,10 @@ export function parseTask(filePath: string): TaskConfig {
   const config = parseYamlSimple(frontmatter);
 
   return {
-    maxIterations: config.max_iterations ?? 10,
-    maxHours: config.max_hours ?? 4,
-    maxBudgetUsd: config.max_budget_usd ?? 30,
-    turnsPerIteration: config.turns_per_iteration ?? 30,
+    maxIterations: (config.max_iterations as number | undefined) ?? 10,
+    maxHours: (config.max_hours as number | undefined) ?? 4,
+    maxBudgetUsd: (config.max_budget_usd as number | undefined) ?? 30,
+    turnsPerIteration: (config.turns_per_iteration as number | undefined) ?? 30,
     freshSession: config.fresh_session === true,
     completionChecks: parseCompletionChecks(config.completion_checks),
     body: body.trim(),

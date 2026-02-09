@@ -1,0 +1,12 @@
+{
+  "taskFile": "/Users/dmitriibaranov/Projects/AI/darkdelve/tasks/smoke-test.md",
+  "sessionId": "97a7c463-3e3e-4cc0-87c9-9c2101f11b81",
+  "iteration": 2,
+  "startedAt": "2026-02-09T09:25:00.000Z",
+  "status": "failed",
+  "compactions": 0,
+  "errors": [],
+  "progressHash": "9c9169ae6e5737dd7d79c8291edd4914",
+  "stagnantCount": 1,
+  "totalCostUsd": 0.23708600000000002
+}

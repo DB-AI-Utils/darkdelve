@@ -1,35 +1,31 @@
 import { readFileSync, existsSync, unlinkSync, mkdirSync } from "fs";
-import { join } from "path";
+import { dirname } from "path";
+import type { RuntimeConfig } from "./config.js";
 import type { Logger } from "./logger.js";
 import type { OrchestratorState } from "./state.js";
 
-const SIGNAL_DIR = ".orchestrator";
-const SIGNAL_FILE = join(SIGNAL_DIR, "task-signal");
-
 // --- Signal file helpers ---
 
-export function readSignalFile(): string | null {
-  if (!existsSync(SIGNAL_FILE)) return null;
-  return readFileSync(SIGNAL_FILE, "utf-8").trim();
+export function readSignalFile(config: RuntimeConfig): string | null {
+  if (!existsSync(config.signalFile)) return null;
+  return readFileSync(config.signalFile, "utf-8").trim();
 }
 
-export function clearSignalFile(): void {
-  mkdirSync(SIGNAL_DIR, { recursive: true });
-  if (existsSync(SIGNAL_FILE)) unlinkSync(SIGNAL_FILE);
+export function clearSignalFile(config: RuntimeConfig): void {
+  mkdirSync(dirname(config.signalFile), { recursive: true });
+  if (existsSync(config.signalFile)) unlinkSync(config.signalFile);
 }
 
 // --- Stop Hook ---
 
-export function buildStopHook(state: OrchestratorState, log: Logger) {
+export function buildStopHook(state: OrchestratorState, log: Logger, config: RuntimeConfig) {
   let consecutiveBlocks = 0;
 
   return async (input: Record<string, unknown>) => {
-    // If another stop hook already handled this, don't interfere
     if (input.stop_hook_active) return {};
 
-    // Check if Claude wrote a completion signal
-    if (existsSync(SIGNAL_FILE)) {
-      const signal = readFileSync(SIGNAL_FILE, "utf-8").trim();
+    if (existsSync(config.signalFile)) {
+      const signal = readFileSync(config.signalFile, "utf-8").trim();
       if (signal === "TASK_COMPLETE" || signal === "TASK_BLOCKED") {
         consecutiveBlocks = 0;
         log.info(`Stop allowed: signal=${signal}`);
@@ -37,8 +33,6 @@ export function buildStopHook(state: OrchestratorState, log: Logger) {
       }
     }
 
-    // Circuit breaker: after 5 consecutive blocks, let it stop.
-    // The outer loop will re-evaluate and resume if needed.
     if (consecutiveBlocks >= 5) {
       consecutiveBlocks = 0;
       log.warn("Circuit breaker: allowing stop after 5 blocks.");
@@ -83,7 +77,6 @@ const PROTECTED_FILES = [".env", ".npmrc", ".orchestrator/state.json"];
 
 export function buildCanUseTool(log: Logger) {
   return async (toolName: string, input: Record<string, unknown>) => {
-    // Block dangerous bash commands
     if (toolName === "Bash") {
       const cmd = input.command as string;
       for (const pattern of DENY_BASH_PATTERNS) {
@@ -94,7 +87,6 @@ export function buildCanUseTool(log: Logger) {
       }
     }
 
-    // Block writes to protected files
     if (toolName === "Write" || toolName === "Edit") {
       const filePath = input.file_path as string;
       if (filePath && PROTECTED_FILES.some((p) => filePath.endsWith(p))) {
