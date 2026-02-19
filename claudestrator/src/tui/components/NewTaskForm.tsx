@@ -24,6 +24,8 @@ const FIELDS: FormField[] = [
   { label: "Max budget (USD)", key: "maxBudgetUsd", defaultValue: "30" },
   { label: "Max hours", key: "maxHours", defaultValue: "4" },
   { label: "Turns per iteration", key: "turnsPerIteration", defaultValue: "30" },
+  { label: "Test command", key: "completionCmd", defaultValue: "" },
+  { label: "Review prompt", key: "reviewPrompt", defaultValue: "" },
 ];
 
 interface FormFieldRowProps {
@@ -113,6 +115,12 @@ export function NewTaskForm({ onSubmit, onCancel }: NewTaskFormProps) {
       return;
     }
 
+    const completionCmd = values.completionCmd.trim();
+    const reviewPrompt = values.reviewPrompt.trim();
+    const checks: Array<{ type: "command"; cmd: string } | { type: "review"; prompt: string }> = [];
+    if (completionCmd) checks.push({ type: "command", cmd: completionCmd });
+    if (reviewPrompt) checks.push({ type: "review", prompt: reviewPrompt });
+
     onSubmit({
       prompt,
       projectDir,
@@ -120,6 +128,7 @@ export function NewTaskForm({ onSubmit, onCancel }: NewTaskFormProps) {
       maxBudgetUsd,
       maxHours,
       turnsPerIteration,
+      completionChecks: checks.length > 0 ? checks : undefined,
     });
   }
 

@@ -1,5 +1,5 @@
 import Docker from "dockerode";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { paths } from "../paths.js";
@@ -19,6 +19,7 @@ export interface ContainerConfig {
   completionChecks: string; // JSON string
   memoryMb?: number;
   cpus?: number;
+  sessionId?: string;
 }
 
 /**
@@ -42,6 +43,7 @@ export async function createContainer(
     Labels: {
       [LABEL_PREFIX]: "true",
       [`${LABEL_PREFIX}.task-id`]: config.taskId,
+      [`${LABEL_PREFIX}.session`]: config.sessionId ?? "",
     },
     // Run as 'coder' user from Dockerfile (no UID override — Docker Desktop handles file ownership)
     HostConfig: {
@@ -74,7 +76,7 @@ export function runLoginContainer(): void {
   }
 
   const args = [
-    "docker", "run", "-it", "--rm",
+    "run", "-it", "--rm",
     "--init",
     "--label", `${LABEL_PREFIX}=true`,
     "--label", `${LABEL_PREFIX}.login=true`,
@@ -86,7 +88,7 @@ export function runLoginContainer(): void {
     IMAGE_NAME,
   ];
 
-  execSync(args.join(" "), { stdio: "inherit" });
+  execFileSync("docker", args, { stdio: "inherit" });
 }
 
 /**
@@ -176,9 +178,11 @@ export async function removeContainer(container: Docker.Container): Promise<void
 }
 
 /**
- * Find and remove all orphaned claudestrator containers.
+ * Find and remove orphaned claudestrator containers.
+ * If excludeSession is provided, containers with that session label are skipped
+ * so that concurrent instances don't kill each other's containers.
  */
-export async function cleanupOrphanedContainers(docker: Docker): Promise<number> {
+export async function cleanupOrphanedContainers(docker: Docker, excludeSession?: string): Promise<number> {
   const containers = await docker.listContainers({
     all: true,
     filters: { label: [`${LABEL_PREFIX}=true`] },
@@ -186,6 +190,9 @@ export async function cleanupOrphanedContainers(docker: Docker): Promise<number>
 
   let cleaned = 0;
   for (const info of containers) {
+    if (excludeSession && info.Labels?.[`${LABEL_PREFIX}.session`] === excludeSession) {
+      continue;
+    }
     try {
       const container = docker.getContainer(info.Id);
       await stopContainer(container, 5);

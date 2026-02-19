@@ -3,7 +3,7 @@ import Docker from "dockerode";
 import type { Task, TaskCreateInput, TaskStore, WorkerEvent } from "../types.js";
 import { createWorktree, removeWorktree, createBranchFromWorktree } from "../worktree.js";
 import { ensureImage } from "../docker/image.js";
-import { createContainer, copyAuth, startContainer, waitContainer, removeContainer } from "../docker/manager.js";
+import { createContainer, copyAuth, startContainer, waitContainer, stopContainer, removeContainer } from "../docker/manager.js";
 import { EventTailer } from "../event-tailer.js";
 import { paths } from "../paths.js";
 
@@ -20,12 +20,14 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
   private docker: Docker;
   private store: TaskStore;
   private contextDir: string;
+  private sessionId: string;
 
-  constructor(docker: Docker, store: TaskStore, contextDir: string) {
+  constructor(docker: Docker, store: TaskStore, contextDir: string, sessionId = "") {
     super();
     this.docker = docker;
     this.store = store;
     this.contextDir = contextDir;
+    this.sessionId = sessionId;
   }
 
   /**
@@ -57,6 +59,7 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
         maxBudgetUsd: task.maxBudgetUsd,
         turnsPerIteration: task.turnsPerIteration,
         completionChecks: JSON.stringify(task.completionChecks),
+        sessionId: this.sessionId,
       });
 
       this.store.update(task.id, {
@@ -75,6 +78,9 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
         this.emit("event", task.id, event);
         this.handleWorkerEvent(task.id, event);
       });
+      tailer.on("error", () => {
+        // Ignore tailer parse errors — they're non-fatal
+      });
       tailer.start();
 
       // 6. Start container
@@ -88,7 +94,12 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
       tailer.stop();
 
       // 9. Update task status based on exit code
-      const finalStatus = exitCode === 0 ? "completed" as const : "failed" as const;
+      const isCancelled = exitCode === 137 || exitCode === 143;
+      const isBlocked = exitCode === 2;
+      const finalStatus = exitCode === 0 ? "completed" as const
+        : isCancelled ? "cancelled" as const
+        : isBlocked ? "blocked" as const
+        : "failed" as const;
       this.store.update(task.id, {
         status: finalStatus,
         exitCode,
@@ -116,10 +127,20 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
       });
       this.emitUpdate(task);
 
-      // Best-effort cleanup
-      if (task.worktreePath) {
+      // Best-effort cleanup using latest task state
+      const latest = this.store.get(task.id)!;
+
+      if (latest.containerId) {
         try {
-          removeWorktree(input.projectDir, task.worktreePath);
+          const container = this.docker.getContainer(latest.containerId);
+          await stopContainer(container, 5);
+          await removeContainer(container);
+        } catch { /* ignore */ }
+      }
+
+      if (latest.worktreePath) {
+        try {
+          removeWorktree(input.projectDir, latest.worktreePath);
         } catch { /* ignore */ }
       }
 

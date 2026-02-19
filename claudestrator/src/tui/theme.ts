@@ -6,6 +6,7 @@ export const STATUS_COLORS: Record<TaskStatus, string> = {
   completed: "blue",
   failed: "red",
   cancelled: "yellow",
+  blocked: "magenta",
 };
 
 export const STATUS_SYMBOLS: Record<TaskStatus, string> = {
@@ -14,4 +15,5 @@ export const STATUS_SYMBOLS: Record<TaskStatus, string> = {
   completed: "✓",
   failed: "✗",
   cancelled: "◆",
+  blocked: "⊘",
 };

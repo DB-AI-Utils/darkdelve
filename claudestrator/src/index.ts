@@ -5,6 +5,7 @@
  * Interactive dashboard for managing autonomous Claude Agent SDK tasks in Docker containers.
  */
 
+import { randomUUID } from "crypto";
 import Docker from "dockerode";
 import { existsSync, readdirSync } from "fs";
 import { resolve, dirname } from "path";
@@ -28,6 +29,8 @@ interface CliArgs {
   maxHours?: number;
   maxBudgetUsd?: number;
   turnsPerIteration?: number;
+  completionCmd?: string;
+  completionReview?: string;
 }
 
 function parseCliArgs(argv: string[]): CliArgs {
@@ -62,7 +65,16 @@ function parseCliArgs(argv: string[]): CliArgs {
     maxHours: map.has("max-hours") ? parseFloat(map.get("max-hours")!) : undefined,
     maxBudgetUsd: map.has("max-budget") ? parseFloat(map.get("max-budget")!) : undefined,
     turnsPerIteration: map.has("turns-per-iteration") ? parseInt(map.get("turns-per-iteration")!, 10) : undefined,
+    completionCmd: map.get("completion-cmd"),
+    completionReview: map.get("completion-review"),
   };
+}
+
+function validatePositive(name: string, value: number | undefined): void {
+  if (value !== undefined && (isNaN(value) || value <= 0)) {
+    console.error(`Error: --${name} must be a positive number.`);
+    process.exit(1);
+  }
 }
 
 function printHelp(): void {
@@ -82,6 +94,8 @@ Options (for 'run'):
   --max-hours <n>             Max hours (default: 4)
   --max-budget <n>            Max budget in USD (default: 30)
   --turns-per-iteration <n>   SDK turns per iteration (default: 30)
+  --completion-cmd <cmd>      Command to verify task completion (e.g. "npm test")
+  --completion-review <prompt> AI review prompt to verify task completion
 
 Examples:
   claudestrator
@@ -167,16 +181,25 @@ if (cliArgs.command === "login") {
 
 checkAuth();
 
-// Startup reconciliation
-const orphaned = await cleanupOrphanedContainers(docker);
+const sessionId = randomUUID().slice(0, 8);
+
+// Create store early so cleanup can query task state
+const store = new SqliteTaskStore();
+
+// Session-aware container cleanup: skip containers belonging to our session
+const orphaned = await cleanupOrphanedContainers(docker, sessionId);
 if (orphaned > 0) {
   console.error(`Cleaned up ${orphaned} orphaned container(s).`);
 }
-pruneOrphanedWorktrees();
 
-// Create store and scheduler
-const store = new SqliteTaskStore();
-const scheduler = new TaskScheduler(docker, store, contextDir);
+// Worktree cleanup: protect worktrees belonging to non-terminal tasks
+// (may include tasks from other running instances sharing the same DB)
+const nonTerminalIds = new Set(
+  store.list().filter((t) => t.status === "running" || t.status === "pending").map((t) => t.id),
+);
+pruneOrphanedWorktrees(nonTerminalIds);
+
+const scheduler = new TaskScheduler(docker, store, contextDir, 3, sessionId);
 
 // Recover stale "running" tasks from previous session
 for (const task of store.list({ status: "running" })) {
@@ -195,6 +218,11 @@ if (cliArgs.command === "run") {
     process.exit(1);
   }
 
+  validatePositive("max-iterations", cliArgs.maxIterations);
+  validatePositive("max-hours", cliArgs.maxHours);
+  validatePositive("max-budget", cliArgs.maxBudgetUsd);
+  validatePositive("turns-per-iteration", cliArgs.turnsPerIteration);
+
   const projectDir = resolve(cliArgs.project ?? ".");
   if (!existsSync(projectDir)) {
     console.error(`Error: Project directory not found: ${projectDir}`);
@@ -208,6 +236,12 @@ if (cliArgs.command === "run") {
     maxHours: cliArgs.maxHours,
     maxBudgetUsd: cliArgs.maxBudgetUsd,
     turnsPerIteration: cliArgs.turnsPerIteration,
+    completionChecks: (cliArgs.completionCmd || cliArgs.completionReview)
+      ? [
+          ...(cliArgs.completionCmd ? [{ type: "command" as const, cmd: cliArgs.completionCmd }] : []),
+          ...(cliArgs.completionReview ? [{ type: "review" as const, prompt: cliArgs.completionReview }] : []),
+        ]
+      : undefined,
   };
 
   const task = scheduler.enqueue(input);
@@ -219,14 +253,16 @@ if (cliArgs.command === "run") {
   } else {
     // Non-TTY: plain renderer, wait for this specific task
     const renderer = createPlainRenderer();
-    scheduler.on("event", (taskId, event) => renderer(taskId, event));
+    scheduler.on("event", (taskId, event) => {
+      if (taskId === task.id) renderer(taskId, event);
+    });
     scheduler.start();
 
     // Poll until the task reaches a terminal state
     await new Promise<void>((resolve) => {
       const check = () => {
         const current = store.get(task.id);
-        if (current && (current.status === "completed" || current.status === "failed" || current.status === "cancelled")) {
+        if (current && (current.status === "completed" || current.status === "failed" || current.status === "cancelled" || current.status === "blocked")) {
           resolve();
         } else {
           setTimeout(check, 1000);

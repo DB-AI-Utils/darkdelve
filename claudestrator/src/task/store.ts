@@ -137,6 +137,10 @@ export class SqliteTaskStore implements TaskStore {
     return this.get(id)!;
   }
 
+  delete(id: string): void {
+    this.db.prepare("DELETE FROM tasks WHERE id = ?").run(id);
+  }
+
   list(filter?: { status?: TaskStatus }): Task[] {
     if (filter?.status) {
       const rows = this.db.prepare("SELECT * FROM tasks WHERE status = ? ORDER BY createdAt ASC").all(filter.status) as TaskRow[];

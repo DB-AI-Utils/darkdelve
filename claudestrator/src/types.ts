@@ -4,11 +4,11 @@ export type CompletionCheck =
   | { type: "command"; cmd: string; timeout_sec?: number }
   | { type: "file_exists"; path: string }
   | { type: "glob_exists"; pattern: string; min_count: number }
-  | { type: "review"; prompt: string; files?: string[] };
+  | { type: "review"; prompt: string };
 
 // --- Task (host-side) ---
 
-export type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled" | "blocked";
 
 export interface Task {
   id: string;
@@ -48,6 +48,7 @@ export interface TaskStore {
   get(id: string): Task | undefined;
   update(id: string, patch: Partial<Task>): Task;
   list(filter?: { status?: TaskStatus }): Task[];
+  delete(id: string): void;
 }
 
 // --- JSONL Events (shared between worker and host) ---

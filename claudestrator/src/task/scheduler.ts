@@ -14,17 +14,19 @@ export class TaskScheduler extends EventEmitter<SchedulerEvents> {
   private docker: Docker;
   private contextDir: string;
   private maxConcurrent: number;
+  private sessionId: string;
   private activeRunners = new Map<string, TaskRunner>();
   private cancelledSet = new Set<string>();
   private ticking = false;
   private started = false;
 
-  constructor(docker: Docker, store: TaskStore, contextDir: string, maxConcurrent = 3) {
+  constructor(docker: Docker, store: TaskStore, contextDir: string, maxConcurrent = 3, sessionId = "") {
     super();
     this.docker = docker;
     this.store = store;
     this.contextDir = contextDir;
     this.maxConcurrent = maxConcurrent;
+    this.sessionId = sessionId;
   }
 
   enqueue(input: TaskCreateInput): Task {
@@ -60,6 +62,14 @@ export class TaskScheduler extends EventEmitter<SchedulerEvents> {
         }
       }
     }
+  }
+
+  delete(taskId: string): void {
+    const task = this.store.get(taskId);
+    if (!task) return;
+    if (task.status === "running" || task.status === "pending") return;
+    this.store.delete(taskId);
+    this.emit("taskUpdate", task);
   }
 
   start(): void {
@@ -103,7 +113,7 @@ export class TaskScheduler extends EventEmitter<SchedulerEvents> {
   }
 
   private launchTask(task: Task): void {
-    const runner = new TaskRunner(this.docker, this.store, this.contextDir);
+    const runner = new TaskRunner(this.docker, this.store, this.contextDir, this.sessionId);
     this.activeRunners.set(task.id, runner);
 
     // Forward runner events
@@ -134,7 +144,7 @@ export class TaskScheduler extends EventEmitter<SchedulerEvents> {
       if (this.cancelledSet.has(task.id)) {
         this.cancelledSet.delete(task.id);
         const current = this.store.get(task.id);
-        if (current && current.status === "running") {
+        if (current && (current.status === "running" || current.status === "failed")) {
           this.store.update(task.id, {
             status: "cancelled",
             finishedAt: new Date().toISOString(),

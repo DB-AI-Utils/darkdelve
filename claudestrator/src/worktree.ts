@@ -85,17 +85,20 @@ export function createBranchFromWorktree(
 /**
  * Prune orphaned clones from ~/.claudestrator/worktrees/.
  * Called on startup to clean up from crashed sessions.
+ * If activeTaskIds is provided, worktrees whose directory name matches
+ * an active task ID are skipped so that concurrent instances don't
+ * destroy each other's working copies.
  */
-export function pruneOrphanedWorktrees(): void {
+export function pruneOrphanedWorktrees(activeTaskIds?: Set<string>): void {
   const worktreeDir = paths.worktrees;
   if (!existsSync(worktreeDir)) return;
 
   const entries = readdirSync(worktreeDir, { withFileTypes: true });
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
+    if (activeTaskIds?.has(entry.name)) continue;
 
     const clonePath = `${worktreeDir}/${entry.name}`;
-    // Remove any leftover clone directories
     rmSync(clonePath, { recursive: true, force: true });
   }
 }

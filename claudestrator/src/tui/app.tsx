@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { render, Box, Text, useInput, useApp } from "ink";
-import type { Task, WorkerEvent } from "../types.js";
+import { existsSync, readFileSync } from "fs";
+import { join } from "path";
+import type { Task, WorkerEvent, WorkerEventRecord } from "../types.js";
 import type { TaskScheduler } from "../task/scheduler.js";
 import { StatusBar } from "./components/StatusBar.js";
 import { TaskDetail, type LogEntry } from "./components/TaskDetail.js";
@@ -17,6 +19,11 @@ function formatElapsed(ms: number): string {
 
 function timeStr(): string {
   const d = new Date();
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
+}
+
+function formatTs(ts: string): string {
+  const d = new Date(ts);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
 }
 
@@ -57,6 +64,32 @@ function workerEventToLogEntry(event: WorkerEvent): { source: LogEntry["source"]
   }
 }
 
+/** Load persisted JSONL logs for all tasks on startup */
+function loadInitialLogs(tasks: Task[]): Map<string, LogEntry[]> {
+  const map = new Map<string, LogEntry[]>();
+  for (const task of tasks) {
+    const eventsFile = join(task.logDir, "events.jsonl");
+    if (!existsSync(eventsFile)) continue;
+    try {
+      const lines = readFileSync(eventsFile, "utf-8").split("\n").filter(Boolean);
+      const entries: LogEntry[] = [];
+      for (const line of lines) {
+        try {
+          const record = JSON.parse(line) as WorkerEventRecord;
+          const entry = workerEventToLogEntry(record.event);
+          if (entry) {
+            entries.push({ time: formatTs(record.ts), source: entry.source, text: entry.text });
+          }
+        } catch { /* skip malformed lines */ }
+      }
+      if (entries.length > 0) {
+        map.set(task.id, entries.length > 500 ? entries.slice(-500) : entries);
+      }
+    } catch { /* skip unreadable files */ }
+  }
+  return map;
+}
+
 type View = "list" | "detail" | "new";
 
 interface DashboardProps {
@@ -70,11 +103,18 @@ function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
   const [view, setView] = useState<View>(initialView);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId);
   const [tasks, setTasks] = useState<Task[]>(() => scheduler.store.list());
-  const [logMap, setLogMap] = useState<Map<string, LogEntry[]>>(new Map());
+  const [logMap, setLogMap] = useState<Map<string, LogEntry[]>>(() => loadInitialLogs(scheduler.store.list()));
   const [scrollOffset, setScrollOffset] = useState(0);
   const [uptime, setUptime] = useState("00:00:00");
+  const [pendingCancel, setPendingCancel] = useState(false);
 
   const startTime = useState(() => Date.now())[0];
+  const selectedTaskIdRef = useRef<string | null>(initialTaskId);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    selectedTaskIdRef.current = selectedTaskId;
+  }, [selectedTaskId]);
 
   // Uptime timer
   useEffect(() => {
@@ -83,6 +123,13 @@ function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
     }, 1000);
     return () => clearInterval(interval);
   }, [startTime]);
+
+  // Auto-dismiss cancel confirmation after 3s
+  useEffect(() => {
+    if (!pendingCancel) return;
+    const timer = setTimeout(() => setPendingCancel(false), 3000);
+    return () => clearTimeout(timer);
+  }, [pendingCancel]);
 
   // Subscribe to scheduler events
   useEffect(() => {
@@ -95,8 +142,10 @@ function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
           next.set(taskId, addEntry(taskEntries, entry.source, entry.text));
           return next;
         });
-        // Auto-scroll when viewing this task's detail
-        setScrollOffset(0);
+        // Maintain scroll position: if viewing this task and scrolled up, hold position
+        if (taskId === selectedTaskIdRef.current) {
+          setScrollOffset((prev) => (prev === 0 ? 0 : prev + 1));
+        }
       }
     };
 
@@ -117,17 +166,29 @@ function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
   useInput((input, key) => {
     if (view !== "detail") return;
 
+    // Handle cancel confirmation first
+    if (pendingCancel) {
+      if (input === "c") {
+        scheduler.cancel(selectedTaskId!);
+      }
+      setPendingCancel(false);
+      return;
+    }
+
     if (key.escape) {
       setView("list");
       setSelectedTaskId(null);
       setScrollOffset(0);
     } else if (key.upArrow) {
       const entries = logMap.get(selectedTaskId ?? "") ?? [];
-      setScrollOffset((p) => Math.min(p + 1, Math.max(0, entries.length - 10)));
+      setScrollOffset((p) => Math.min(p + 1, Math.max(0, entries.length - 15)));
     } else if (key.downArrow) {
       setScrollOffset((p) => Math.max(0, p - 1));
     } else if (input === "c" && selectedTaskId) {
-      scheduler.cancel(selectedTaskId);
+      const task = tasks.find((t) => t.id === selectedTaskId);
+      if (task && (task.status === "running" || task.status === "pending")) {
+        setPendingCancel(true);
+      }
     }
   });
 
@@ -163,6 +224,7 @@ function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
           }}
           onNew={() => setView("new")}
           onCancel={(taskId) => scheduler.cancel(taskId)}
+          onDelete={(taskId) => scheduler.delete(taskId)}
           onQuit={handleQuit}
         />
       </Box>
@@ -217,6 +279,30 @@ function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
             <Text dimColor>Budget: ${selectedTask.costUsd.toFixed(2)}/{selectedTask.maxBudgetUsd}</Text>
             <Text dimColor>Project: {selectedTask.projectDir}</Text>
           </Box>
+
+          <Box paddingX={1}>
+            <Text dimColor wrap="truncate">
+              Prompt: {selectedTask.prompt.length > 80 ? selectedTask.prompt.slice(0, 77) + "..." : selectedTask.prompt}
+            </Text>
+          </Box>
+
+          {selectedTask.status === "completed" && (() => {
+            const branchEntry = entries.find((e) => e.text.startsWith("Branch created:"));
+            if (!branchEntry) return null;
+            return (
+              <Box paddingX={1}>
+                <Text color="green">{branchEntry.text}</Text>
+              </Box>
+            );
+          })()}
+
+          {selectedTask.error && (
+            <Box paddingX={1}>
+              <Text color="red" wrap="truncate">
+                Error: {selectedTask.error.length > 120 ? selectedTask.error.slice(0, 117) + "..." : selectedTask.error}
+              </Text>
+            </Box>
+          )}
         </>
       )}
 
@@ -225,6 +311,12 @@ function Dashboard({ scheduler, initialView, initialTaskId }: DashboardProps) {
         maxVisible={15}
         scrollOffset={scrollOffset}
       />
+
+      {pendingCancel && (
+        <Box paddingX={1}>
+          <Text color="yellow" bold>Cancel this task? Press c again to confirm, any other key to dismiss.</Text>
+        </Box>
+      )}
 
       <Box paddingX={1} gap={2}>
         <Text dimColor><Text bold>Esc</Text> Back</Text>

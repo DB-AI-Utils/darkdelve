@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { existsSync, readFileSync } from "fs";
+import { existsSync } from "fs";
 import { globSync } from "glob";
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import type { CompletionCheck } from "../types.js";
@@ -10,7 +10,7 @@ interface CheckResult {
   reason?: string;
 }
 
-export async function runCompletionChecks(checks: CompletionCheck[], cwd: string) {
+export async function runCompletionChecks(checks: CompletionCheck[], cwd: string, taskPrompt?: string) {
   const results: CheckResult[] = [];
 
   for (const check of checks) {
@@ -37,7 +37,7 @@ export async function runCompletionChecks(checks: CompletionCheck[], cwd: string
         break;
       }
       case "review": {
-        const result = await runReviewCheck(check.prompt, check.files, cwd);
+        const result = await runReviewCheck(check.prompt, cwd, taskPrompt);
         results.push(result);
         break;
       }
@@ -53,32 +53,14 @@ export async function runCompletionChecks(checks: CompletionCheck[], cwd: string
 
 async function runReviewCheck(
   prompt: string,
-  filePatterns: string[] | undefined,
   cwd: string,
+  taskPrompt?: string,
 ): Promise<CheckResult> {
-  let fileContext = "";
-  if (filePatterns) {
-    for (const pattern of filePatterns) {
-      const paths = globSync(pattern, { cwd });
-      for (const p of paths) {
-        const fullPath = `${cwd}/${p}`;
-        if (existsSync(fullPath)) {
-          try {
-            const content = readFileSync(fullPath, "utf-8");
-            fileContext += `\n--- ${p} ---\n${content}\n`;
-          } catch {
-            // skip unreadable files
-          }
-        }
-      }
-    }
-  }
-
   const reviewPrompt =
-    `You are a code reviewer. Evaluate the following and respond with exactly PASS or FAIL on the FIRST line, then your reasoning.\n\n` +
-    `## Review criteria\n${prompt}\n` +
-    (fileContext ? `\n## Files\n${fileContext}` : "") +
-    `\n\nRespond with PASS or FAIL on the first line.`;
+    (taskPrompt ? `## Original task\n${taskPrompt}\n\n` : "") +
+    `## Review criteria\n${prompt}\n\n` +
+    `Review the code in this workspace. Read whatever files you need to evaluate the criteria above. ` +
+    `When done, respond with exactly PASS or FAIL on the FIRST line, then your reasoning.`;
 
   try {
     let resultText = "";
@@ -86,8 +68,7 @@ async function runReviewCheck(
     for await (const message of query({
       prompt: reviewPrompt,
       options: {
-        maxTurns: 1,
-        systemPrompt: "You are a strict code reviewer. Read the files provided. Respond with PASS or FAIL on the first line, then explain why.",
+        systemPrompt: "You are a strict code reviewer. You have full access to the workspace. Read whatever files you need to evaluate the review criteria. Respond with PASS or FAIL on the first line, then explain why.",
         allowDangerouslySkipPermissions: true,
         cwd,
       },

@@ -205,6 +205,8 @@ async function orchestratorLoop(
   stateFile: string,
   signalPath: string,
 ): Promise<void> {
+  let lastCheckFailure: string | null = null;
+
   while (state.iteration < config.maxIterations && !isTimedOut(state, config.maxHours)) {
     state.iteration++;
     state.status = "running";
@@ -223,7 +225,10 @@ async function orchestratorLoop(
 
     const prompt = useFreshSession
       ? config.prompt + "\n\nCheck .orchestrator/progress.md for any prior progress."
-      : "Continue working. Check .orchestrator/progress.md for current state.";
+      : lastCheckFailure
+        ? `Continue working. Your previous completion attempt failed: ${lastCheckFailure}. Fix these issues and try again. Check .orchestrator/progress.md for current state.`
+        : "Continue working. Check .orchestrator/progress.md for current state.";
+    lastCheckFailure = null;
 
     const systemAppend =
       "You are in autonomous mode. " +
@@ -333,6 +338,13 @@ async function orchestratorLoop(
       numTurns: iterationTurns,
     });
 
+    if (state.totalCostUsd >= config.maxBudgetUsd) {
+      logger.emit({ type: "message", source: "system", text: `Budget exhausted: $${state.totalCostUsd.toFixed(2)} >= $${config.maxBudgetUsd}` });
+      state.status = "failed";
+      saveState(state, stateFile);
+      break;
+    }
+
     if (wasAborted) {
       saveState(state, stateFile);
       continue;
@@ -344,13 +356,14 @@ async function orchestratorLoop(
     if (signal === "TASK_COMPLETE") {
       logger.emit({ type: "signal", signal });
       if (config.completionChecks.length > 0) {
-        const checks = await runCompletionChecks(config.completionChecks, cwd);
+        const checks = await runCompletionChecks(config.completionChecks, cwd, config.prompt);
         logger.emit({ type: "completion", allPassed: checks.allPassed, summary: checks.summary });
         if (checks.allPassed) {
           state.status = "completed";
           saveState(state, stateFile);
           break;
         }
+        lastCheckFailure = checks.summary;
         clearSignalFile(signalPath);
       } else {
         state.status = "completed";

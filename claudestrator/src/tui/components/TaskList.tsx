@@ -8,18 +8,57 @@ interface TaskListProps {
   onSelect: (taskId: string) => void;
   onNew: () => void;
   onCancel: (taskId: string) => void;
+  onDelete: (taskId: string) => void;
   onQuit: () => void;
 }
 
-export function TaskListView({ tasks, onSelect, onNew, onCancel, onQuit }: TaskListProps) {
+function compactElapsed(startedAt: string | null, finishedAt: string | null): string {
+  if (!startedAt) return "-";
+  const start = new Date(startedAt).getTime();
+  const end = finishedAt ? new Date(finishedAt).getTime() : Date.now();
+  const ms = end - start;
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  if (h > 0) return `${h}h${m > 0 ? `${String(m).padStart(2, "0")}m` : ""}`;
+  if (m > 0) return `${m}m`;
+  return "<1m";
+}
+
+export function TaskListView({ tasks, onSelect, onNew, onCancel, onDelete, onQuit }: TaskListProps) {
   const [cursorIndex, setCursorIndex] = useState(0);
+  const [pendingAction, setPendingAction] = useState<null | { type: "quit" } | { type: "cancel"; taskId: string }>(null);
 
   // Clamp cursor when tasks change
   useEffect(() => {
     setCursorIndex((prev) => Math.min(prev, Math.max(0, tasks.length - 1)));
   }, [tasks.length]);
 
+  // Auto-dismiss confirmation after 3s
+  useEffect(() => {
+    if (!pendingAction) return;
+    const timer = setTimeout(() => setPendingAction(null), 3000);
+    return () => clearTimeout(timer);
+  }, [pendingAction]);
+
   useInput((input, key) => {
+    // Handle pending confirmation first
+    if (pendingAction) {
+      if (pendingAction.type === "quit" && input === "q") {
+        setPendingAction(null);
+        onQuit();
+        return;
+      }
+      if (pendingAction.type === "cancel" && input === "c") {
+        onCancel(pendingAction.taskId);
+        setPendingAction(null);
+        return;
+      }
+      // Any other key dismisses
+      setPendingAction(null);
+      return;
+    }
+
     if (key.upArrow) {
       setCursorIndex((p) => Math.max(0, p - 1));
     } else if (key.downArrow) {
@@ -31,10 +70,20 @@ export function TaskListView({ tasks, onSelect, onNew, onCancel, onQuit }: TaskL
     } else if (input === "c" && tasks.length > 0) {
       const task = tasks[cursorIndex];
       if (task.status === "running" || task.status === "pending") {
-        onCancel(task.id);
+        setPendingAction({ type: "cancel", taskId: task.id });
+      }
+    } else if (input === "d" && tasks.length > 0) {
+      const task = tasks[cursorIndex];
+      if (task.status !== "running" && task.status !== "pending") {
+        onDelete(task.id);
       }
     } else if (input === "q") {
-      onQuit();
+      const runningCount = tasks.filter((t) => t.status === "running").length;
+      if (runningCount > 0) {
+        setPendingAction({ type: "quit" });
+      } else {
+        onQuit();
+      }
     }
   });
 
@@ -69,18 +118,33 @@ export function TaskListView({ tasks, onSelect, onNew, onCancel, onQuit }: TaskL
             <Box width={8}>
               <Text dimColor>i:{task.iteration}</Text>
             </Box>
+            <Box width={8}>
+              <Text dimColor>{compactElapsed(task.startedAt, task.finishedAt)}</Text>
+            </Box>
             <Box width={10}>
               <Text dimColor>${task.costUsd.toFixed(2)}</Text>
             </Box>
-            <Text wrap="truncate">{task.prompt.slice(0, 60)}</Text>
+            <Text wrap="truncate">{task.prompt.slice(0, 50)}</Text>
           </Box>
         );
       })}
-      <Box paddingTop={1} gap={2}>
+
+      {pendingAction && (
+        <Box paddingTop={1} paddingX={1}>
+          <Text color="yellow" bold>
+            {pendingAction.type === "quit"
+              ? `Quit will cancel ${tasks.filter((t) => t.status === "running").length} running task(s). Press q again to confirm.`
+              : `Cancel task ${(pendingAction as { type: "cancel"; taskId: string }).taskId}? Press c again to confirm.`}
+          </Text>
+        </Box>
+      )}
+
+      <Box paddingTop={pendingAction ? 0 : 1} gap={2}>
         <Text dimColor><Text bold>↑/↓</Text> Navigate</Text>
         <Text dimColor><Text bold>Enter</Text> View</Text>
         <Text dimColor><Text bold>n</Text> New</Text>
         <Text dimColor><Text bold>c</Text> Cancel</Text>
+        <Text dimColor><Text bold>d</Text> Delete</Text>
         <Text dimColor><Text bold>q</Text> Quit</Text>
       </Box>
     </Box>
