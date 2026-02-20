@@ -1,6 +1,6 @@
 import Docker from "dockerode";
 import { execFileSync } from "child_process";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync, statSync } from "fs";
 import { join } from "path";
 import { paths } from "../paths.js";
 
@@ -92,38 +92,57 @@ export function runLoginContainer(): void {
 }
 
 /**
- * Copy saved auth files into the container:
- * - ~/.claudestrator/auth/* → /home/coder/.claude/ (credentials, settings)
- * - ~/.claudestrator/claude.json → /home/coder/.claude.json (CLI state/onboarding)
+ * Copy auth + config files into the container.
+ * Returns names of injected files for logging.
+ *
+ * Sources:
+ * - ~/.claudestrator/auth/*       → /home/coder/.claude/    (OAuth credentials)
+ * - ~/.claudestrator/claude.json  → /home/coder/.claude.json (CLI state/onboarding)
+ * - ~/.claude/CLAUDE.md           → /home/coder/.claude/CLAUDE.md (global instructions)
+ * - ~/.claude/settings.json       → /home/coder/.claude/settings.json (env vars, permissions)
+ * - ~/.codex/auth.json            → /home/coder/.codex/auth.json (Codex MCP auth)
+ * - ~/.codex/config.toml          → /home/coder/.codex/config.toml (Codex config)
  */
-export async function copyAuth(container: Docker.Container): Promise<void> {
+export async function copyAuth(container: Docker.Container): Promise<string[]> {
   const { pack } = await import("tar-stream");
   const packer = pack();
   const chunks: Buffer[] = [];
+  const injected: string[] = [];
 
-  // Copy auth directory files (credentials, settings)
+  const tarOpts = { uid: 1000, gid: 1000 };
+
+  function addFile(hostPath: string, tarName: string, mode?: number): void {
+    if (!existsSync(hostPath)) return;
+    try {
+      if (statSync(hostPath).isDirectory()) return;
+      const content = readFileSync(hostPath);
+      packer.entry({ name: tarName, mode: mode ?? 0o644, ...tarOpts }, content);
+      injected.push(tarName);
+    } catch {
+      // skip unreadable
+    }
+  }
+
+  // Auth directory files (OAuth credentials)
   const authDir = paths.auth;
   if (existsSync(authDir)) {
     for (const file of readdirSync(authDir)) {
-      const filePath = join(authDir, file);
-      try {
-        const content = readFileSync(filePath);
-        packer.entry({ name: `.claude/${file}` }, content);
-      } catch {
-        // skip unreadable files (directories, etc.)
-      }
+      addFile(join(authDir, file), `.claude/${file}`);
     }
   }
 
-  // Copy claude.json (CLI state — needed to skip onboarding)
-  if (existsSync(paths.claudeJson)) {
-    try {
-      const content = readFileSync(paths.claudeJson);
-      packer.entry({ name: ".claude.json" }, content);
-    } catch {
-      // skip if unreadable
-    }
-  }
+  // CLI state (skip onboarding)
+  addFile(paths.claudeJson, ".claude.json");
+
+  // Global instructions
+  addFile(paths.claudeMd, ".claude/CLAUDE.md");
+
+  // User settings (env vars, permissions)
+  addFile(paths.claudeSettings, ".claude/settings.json");
+
+  // Codex MCP credentials + config
+  addFile(paths.codexAuth, ".codex/auth.json", 0o600);
+  addFile(paths.codexConfig, ".codex/config.toml");
 
   packer.finalize();
 
@@ -135,6 +154,8 @@ export async function copyAuth(container: Docker.Container): Promise<void> {
   if (tarBuf.length > 0) {
     await container.putArchive(tarBuf, { path: "/home/coder" });
   }
+
+  return injected;
 }
 
 /**

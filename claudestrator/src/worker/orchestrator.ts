@@ -272,7 +272,7 @@ async function orchestratorLoop(
             preset: "claude_code" as const,
             append: systemAppend,
           },
-          settingSources: ["project" as const],
+          settingSources: ["project" as const, "user" as const],
           ...(mcpServers ? { mcpServers: mcpServers as Record<string, never> } : {}),
           allowDangerouslySkipPermissions: true,
         },

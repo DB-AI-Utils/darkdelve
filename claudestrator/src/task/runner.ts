@@ -69,8 +69,13 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
       });
       this.emitUpdate(task);
 
-      // 4. Copy auth files
-      await copyAuth(container);
+      // 4. Copy auth + config files
+      const injectedFiles = await copyAuth(container);
+      this.emit("event", task.id, {
+        type: "message",
+        source: "system",
+        text: `Injected ${injectedFiles.length} files: ${injectedFiles.join(", ")}`,
+      });
 
       // 5. Start event tailer before starting container
       const tailer = new EventTailer(paths.taskEventsFile(task.id));

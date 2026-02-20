@@ -179,7 +179,7 @@ Claude Code's MCP timeout is `2400000ms` (40 minutes). After that, the tool call
 
 | Fact | Value |
 |------|-------|
-| Claude Code MCP timeout | 40 minutes (2400000ms) |
+| Claude Code MCP timeout | 10 minutes (600000ms) — configured in `~/.claude/settings.json` |
 | Normal Codex response time | ~3 minutes for plan reviews |
 | Codex MCP server version | `0.98.0` (as of 2026-02-09) |
 | Codex binary | `~/.nvm/versions/node/v22.14.0/lib/node_modules/@openai/codex/vendor/aarch64-apple-darwin/codex/codex` |
