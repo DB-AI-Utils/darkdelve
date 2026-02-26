@@ -27,7 +27,8 @@ ENV HOME=/home/coder
 
 # Git config for commits inside container
 RUN git config --global user.name "Claudestrator" \
-    && git config --global user.email "claudestrator@local"
+    && git config --global user.email "claudestrator@local" \
+    && git config --global --add safe.directory /workspace
 
 # Pre-create directories Claude CLI and Codex need to write to
 RUN mkdir -p /home/coder/.claude/debug \

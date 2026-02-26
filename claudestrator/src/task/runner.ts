@@ -42,7 +42,7 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
 
     try {
       // 1. Create worktree
-      const worktreePath = createWorktree(input.projectDir, task.id);
+      const worktreePath = await createWorktree(input.projectDir, task.id);
       this.store.update(task.id, { worktreePath });
 
       // 2. Ensure Docker image
@@ -113,7 +113,7 @@ export class TaskRunner extends EventEmitter<TaskRunnerEvents> {
       this.emitUpdate(task);
 
       // 10. Create branch from worktree if there are commits
-      const branchName = createBranchFromWorktree(input.projectDir, worktreePath, task.id);
+      const branchName = await createBranchFromWorktree(input.projectDir, worktreePath, task.id);
       if (branchName) {
         this.emit("event", task.id, { type: "message", source: "system", text: `Branch created: ${branchName}` });
       }

@@ -101,7 +101,8 @@ export class TaskScheduler extends EventEmitter<SchedulerEvents> {
 
     try {
       while (this.activeRunners.size < this.maxConcurrent) {
-        const pending = this.store.list({ status: "pending" });
+        const pending = this.store.list({ status: "pending" })
+          .filter((t) => !this.activeRunners.has(t.id));
         if (pending.length === 0) break;
 
         const task = pending[0];

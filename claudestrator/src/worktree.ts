@@ -1,18 +1,35 @@
-import { execSync } from "child_process";
+import { execFile } from "child_process";
 import { existsSync, readdirSync, rmSync } from "fs";
+import { promisify } from "util";
 import { paths } from "./paths.js";
+
+const execFileAsync = promisify(execFile);
+
+function execGit(args: string[], opts?: { cwd?: string }): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync("git", args, {
+    cwd: opts?.cwd,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+}
 
 /**
  * Create a standalone git clone of the project for a task.
  * Unlike worktrees, clones have a self-contained .git directory
  * that works correctly when bind-mounted into Docker containers.
  */
-export function createWorktree(projectDir: string, taskId: string): string {
+export async function createWorktree(projectDir: string, taskId: string): Promise<string> {
   const clonePath = paths.worktreePath(taskId);
 
-  execSync(`git clone --local "${projectDir}" "${clonePath}"`, {
-    stdio: "pipe",
-  });
+  if (existsSync(clonePath)) {
+    rmSync(clonePath, { recursive: true, force: true });
+  }
+
+  try {
+    await execGit(["clone", "--no-local", projectDir, clonePath]);
+  } catch (err: unknown) {
+    const stderr = (err as { stderr?: string })?.stderr ?? "";
+    throw new Error(`git clone failed: ${stderr || (err as Error).message}`);
+  }
 
   return clonePath;
 }
@@ -31,50 +48,32 @@ export function removeWorktree(_projectDir: string, clonePath: string): void {
  * Uses `git fetch` to bring commits from the clone into the original.
  * Returns the branch name if created, null if there were no new commits.
  */
-export function createBranchFromWorktree(
+export async function createBranchFromWorktree(
   projectDir: string,
   clonePath: string,
   taskId: string,
-): string | null {
-  // Auto-commit any uncommitted changes left by the worker
+): Promise<string | null> {
   try {
-    const status = execSync("git status --porcelain", {
-      cwd: clonePath,
-      stdio: "pipe",
-    }).toString().trim();
+    const { stdout: status } = await execGit(["status", "--porcelain"], { cwd: clonePath });
 
-    if (status) {
-      execSync('git add -A && git commit -m "Uncommitted changes from claudestrator task"', {
-        cwd: clonePath,
-        stdio: "pipe",
-      });
+    if (status.trim()) {
+      await execGit(["add", "-A"], { cwd: clonePath });
+      await execGit(["commit", "-m", "Uncommitted changes from claudestrator task"], { cwd: clonePath });
     }
   } catch {
     // best effort
   }
 
-  // Check if clone HEAD differs from the original HEAD
   try {
-    const cloneHead = execSync("git rev-parse HEAD", {
-      cwd: clonePath,
-      stdio: "pipe",
-    }).toString().trim();
+    const { stdout: cloneHead } = await execGit(["rev-parse", "HEAD"], { cwd: clonePath });
+    const { stdout: originalHead } = await execGit(["rev-parse", "HEAD"], { cwd: projectDir });
 
-    const originalHead = execSync("git rev-parse HEAD", {
-      cwd: projectDir,
-      stdio: "pipe",
-    }).toString().trim();
-
-    if (cloneHead === originalHead) {
-      return null; // No new commits
+    if (cloneHead.trim() === originalHead.trim()) {
+      return null;
     }
 
-    // Fetch the clone's HEAD into a branch in the original repo
     const branchName = `claudestrator/${taskId}`;
-    execSync(
-      `git fetch "${clonePath}" HEAD:refs/heads/${branchName}`,
-      { cwd: projectDir, stdio: "pipe" },
-    );
+    await execGit(["fetch", clonePath, `HEAD:refs/heads/${branchName}`], { cwd: projectDir });
 
     return branchName;
   } catch {
